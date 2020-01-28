@@ -4,7 +4,7 @@ six
 colorama
 python-dateutil
 subprocess32; python_version < '3'
-PyKCS11==1.5.5; python_version > '3'
+PyKCS11>=1.5.5; python_version > '3'
 mock; python_version < '3.3'
 # Pin to versions supported by `coveralls` (see .travis.yml)
 # https://github.com/coveralls-clients/coveralls-python/releases/tag/1.8.1
