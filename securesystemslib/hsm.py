@@ -18,6 +18,16 @@
   to communicate with the cryptographic tokens
 
 TODO: Docstrings
+TODO: Error handling
+  - PyKCS11 openSession on a slot  requires prior call to get slots
+    (can't just pass integer id)
+  - handle hsm return invalid/incomplete data (e.g. getAttributeValue)
+
+TODO: Exception taxonomy
+
+TODO: Note about DRY with securesystemslib.keys and securesystemslib.gpg.{rsa,dsa,eddsa}
+
+TODO: keyid and mechanisms: just pass to export_pubkey and create_signature? :)
 
 """
 
@@ -26,6 +36,7 @@ import binascii
 import asn1crypto
 
 import securesystemslib.formats
+import securesystemslib.hash
 from securesystemslib.exceptions import (
     UnsupportedLibraryError, PKCS11DynamicLibraryLoadingError)
 
@@ -37,9 +48,11 @@ NO_CRYPTO_MSG = "This operations requires cryptography."
 try:
   from cryptography.hazmat.primitives import serialization
   from cryptography.hazmat.backends import default_backend
+  from cryptography.hazmat.primitives.asymmetric import padding
   from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicNumbers
   from cryptography.hazmat.primitives.asymmetric.ec import (
       EllipticCurvePublicNumbers)
+
   from cryptography import x509
 
 except ImportError:
@@ -47,6 +60,16 @@ except ImportError:
 
 # Default salt size in bytes
 _SALT_SIZE = 16
+
+# Key types
+KEY_TYPE_RSA = "rsa"
+KEY_TYPE_DSA = "dsa"
+KEY_TYPE_ECC = "ecc"
+
+# Signing schemes
+RSASSA_PSS_SHA256 = "rsassa-pss-sha256"
+# RSASSA_PKCS15_SHA256 = "rsa-pkcs1v15-sha256"
+ECDSA_SIGN = "ecdsa-sign"
 
 # Module global to hold an instance of PyKCS11.PyKCS11Lib. If it remains 'None'
 # it means that the PyKCS11 library is not available.
@@ -69,28 +92,25 @@ try:
   # Create mechanisms constants
   # TODO: Check mechanism names / what are mechanisms again?
   # TODO: Check mechanism flexibility
-  RSA_PKCS1V15_SHA256 = PyKCS11.RSA_PSS_Mechanism(
-      PyKCS11.CKM_SHA256_RSA_PKCS,
-      PyKCS11.CKM_SHA256,
-      PyKCS11.CKG_MGF1_SHA256,
-      _SALT_SIZE
-  )
-  RSASSA_PSS_SHA256 = PyKCS11.RSA_PSS_Mechanism(
-      PyKCS11.CKM_SHA1_RSA_PKCS_PSS,
-      PyKCS11.CKM_SHA256,
-      PyKCS11.CKG_MGF1_SHA256,
-      _SALT_SIZE
-  )
-  ECDSA_SIGN = PyKCS11.Mechanism(PyKCS11.CKM_ECDSA)
   MECHANISMS = {
-    "rsa-pkcs1v15-sha256": RSA_PKCS1V15_SHA256,
-    "rsassa-pss-sha256": RSASSA_PSS_SHA256,
-    "ecdsa-sign": ECDSA_SIGN
-  }
+      RSASSA_PSS_SHA256: PyKCS11.RSA_PSS_Mechanism(
+          PyKCS11.CKM_SHA256_RSA_PKCS_PSS,
+          PyKCS11.CKM_SHA256,
+          PyKCS11.CKG_MGF1_SHA256,
+          _SALT_SIZE
+        ),
+      # RSASSA_PKCS15_SHA256: PyKCS11.Mechanism(
+      #     PyKCS11.CKM_SHA256_RSA_PKCS,
+      #     PyKCS11.CKM_SHA256,
+      #     PyKCS11.CKG_MGF1_SHA256,
+      #     _SALT_SIZE
+      #   ),
+      ECDSA_SIGN: PyKCS11.Mechanism(PyKCS11.CKM_ECDSA)
+    }
 
 
   def _load_pkcs11_lib(path=None):
-    """Define this  """
+    """TODO  """
     global PKCS11_DYN_LIB
     try:
       # If path is not passed PyKCS11 consults the PYKCS11LIB env var
@@ -122,6 +142,9 @@ def load_pkcs11_lib(path=None):
   """
   <Purpose>
     Load PKCS#11 dynamic library on 'PKCS11' instance (module global).
+
+    NOTE: Wraps _load_pkcs11_lib, which needs to be defined above in the import
+    block because we also use there.
 
   <Arguments>
     path: (optional)
@@ -207,7 +230,7 @@ def get_keys_on_hsm(hsm_info, user_pin=None):
   if not PKCS11_DYN_LIB:
     raise UnsupportedLibraryError(NO_PKCS11_DYN_LIB_MSG)
 
-  # TODO: HSM_INFO_SCHEMA.check_macht(hsm_info)
+  # TODO: HSM_INFO_SCHEMA.check_match(hsm_info)
 
   if user_pin:
     securesystemslib.formats.PASSWORD_SCHEMA.check_match(user_pin)
@@ -221,21 +244,12 @@ def get_keys_on_hsm(hsm_info, user_pin=None):
       [(PyKCS11.CKA_CLASS, PyKCS11.CKO_PRIVATE_KEY)]) + session.findObjects(
       [(PyKCS11.CKA_CLASS, PyKCS11.CKO_PUBLIC_KEY)]):
 
-    # TODO: Re-think data structure: attribute names and values should be human
-    # readable but also keep the PKCS11 constants
-    # TODO: Replace dict comprehension
-    # TODO: Assert len(return val of getAttributeValue) == 1 of
-    # TODO: Only add things that allow is to uniquely identify objects, in
-    # 'export_pubkey' and 'create_signature'.
+    # TODO: Assert len(return val of getAttributeValue) == 1 of ?
+    # TODO: Add more human readable info? key type (CKA_KEY_TYPE),
+    # only show one per id (public and private)?
     hsm_key_info_list.append({
-        attribute: session.getAttributeValue(obj, [attribute])[0]
-        for attribute in [
-            PyKCS11.CKA_ID,
-            PyKCS11.CKA_CLASS,
-            PyKCS11.CKA_KEY_TYPE,
-            PyKCS11.CKA_LABEL,
-            PyKCS11.CKA_SIGN
-          ]
+      "key_id": session.getAttributeValue(obj, [PyKCS11.CKA_ID])[0],
+      "label": session.getAttributeValue(obj, [PyKCS11.CKA_LABEL])[0]
       })
 
   # Logout, if logged in, and close session
@@ -245,15 +259,26 @@ def get_keys_on_hsm(hsm_info, user_pin=None):
 
 
 
-
-def export_pubkey(hsm_info, public_key_info):
+def export_pubkey(hsm_info, hsm_key_id, mechanism, sslib_key_id):
   """
   <Purpose>
-    Get the public key value corresponding to the 'public_key_handle'
+    Export a public key identified by the passed hsm_info and key_info
+    into asecuresystemslib-like format.
+
+
+
+    Cryptoki data types
+
+    http://docs.oasis-open.org/pkcs11/pkcs11-base/v3.0/pkcs11-base-v3.0.html
+    https://docs.oasis-open.org/pkcs11/pkcs11-curr/v3.0/cs01/pkcs11-curr-v3.0-cs01.html
+
+    Big integer
+      a string of CK_BYTE (unsigned chas) representing an unsigned
+      integer of arbitrary size, most-significant byte first (e.g., the integer
+      32768 is represented as the 2-byte string 0x80 0x00)
+
 
   <Arguments>
-    public_key_info:
-      element of the list returned by get_public_key_objects().
 
   <Exceptions>
     TODO
@@ -262,170 +287,212 @@ def export_pubkey(hsm_info, public_key_info):
     A public key dictionary that conforms to 'PUBLIC_KEY_SCHEMA'.
 
   """
-  if not CRYPTO:
-    raise UnsupportedLibraryError(NO_CRYPTO_MSG)
-
   if PKCS11 is None:
     raise UnsupportedLibraryError(NO_PKCS11_PY_LIB_MSG)
 
   if not PKCS11_DYN_LIB:
     raise UnsupportedLibraryError(NO_PKCS11_DYN_LIB_MSG)
 
-  # TODO: HSM_INFO_SCHEMA.check_macht(hsm_info)
-  # TODO: HSM_KEY_INFO_SCHEMA.check_macht(public_key_info)
+  # TODO: HSM_INFO_SCHEMA.check_match(hsm_info)
+  # TODO: HSM_KEY_INFO_SCHEMA.check_match(key_info)
+  # TODO: keyid check
+  # mechanism check
 
   # Create HSM session, without logging in, which is not required for pubkeys
   session = _setup_session(hsm_info)
 
+  # TODO: KeyError check
   key_objects = session.findObjects([
       (PyKCS11.CKA_CLASS, PyKCS11.CKO_PUBLIC_KEY),
-      (PyKCS11.CKA_ID, public_key_info[PyKCS11.CKA_ID])])
+      (PyKCS11.CKA_ID, hsm_key_id)])
 
-  # TODO: is ValueError the right function here?
+  # TODO: is ValueError the right exception here?
   if len(key_objects) < 1:
     raise ValueError("cannot find key with keyid '{}' on hsm '{}'".format(
-        public_key_info[PyKCS11.CKA_ID], hsm_info["slot_id"]))
+        hsm_key_id, hsm_info["slot_id"]))
 
   if len(key_objects) > 1:
     raise ValueError("found multiple keys with keyid '{}' on hsm '{}'".format(
-        public_key_info[PyKCS11.CKA_ID], hsm_info["slot_id"]))
+        hsm_key_id, hsm_info["slot_id"]))
+
+  key_object = key_objects.pop()
+
+  key_type = session.getAttributeValue(key_object, [PyKCS11.CKA_KEY_TYPE])[0] # TODO: err
+
+  if key_type == PyKCS11.CKK_RSA:
+    modulus, exponent  = session.getAttributeValue(key_object, [
+        PyKCS11.CKA_MODULUS,
+        PyKCS11.CKA_PUBLIC_EXPONENT
+      ]) # TODO: err
+
+    # TODO: Use right scheme and create constants
+    key_type = KEY_TYPE_RSA
+
+    # TODO: convert public numbers ?
+    public_key_value = {
+        "e": binascii.hexlify(bytes(exponent)).decode("ascii"),
+        "n": binascii.hexlify(bytes(modulus)).decode("ascii")
+      }
+
+  # elif key_type == PyKCS11.CKK_EC:
+    # params, point  = session.getAttributeValue(key_object, [
+    #     PyKCS11.CKA_EC_PARAMS,
+    #     PyKCS11.CKA_EC_POINT
+    #   ]) # TODO: err
+    # CKA_EC_PARAMS (key type)
+    # CKA_EC_POINT (value Q)
+
+    # use asn1crypto
+
+  # elif key_type == PyKCS11.CKK_DSA:
+    # prime, subprime, base, value, = session.getAttributeValue(key_object, [
+    #     PyKCS11.CKA_PRIME,
+    #     PyKCS11.CKA_SUBPRIME,
+    #     PyKCS11.CKA_BASE,
+    #     PyKCS11.CKA_VALUE
+    #   ]) # TODO: err
+    # key_type = "dsa"
+    # public_key_value = {
+    #   "p": prime,
+    #   "q": subprime,
+    #   "g": base,
+    #   "y": val
+    # }
+    # serialization.load_der_public_key?? (glaub ich ehe rnicht)
+
+  else:
+    raise ValueError("key type '{}' not supported".format(key_type))
+
+  #TODO: method?
+  return {
+      "keyid": sslib_key_id,
+      "keytype": key_type,
+      "mechanism": mechanism,
+      "keyval": {
+        "public": public_key_value
+      }
+    }
 
 
-  # TODO: Find out which keys we want to support and do case handling Tanishq
-  # already seems to have figured out RSA below, and I got ECC. Anything else?
+
+def create_signature(hsm_info, hsm_key_id, user_pin, data, mechanism, sslib_key_id):
+  """
+  TODO
+
+  """
+  if PKCS11 is None:
+    raise UnsupportedLibraryError(NO_PKCS11_PY_LIB_MSG)
+
+  if not PKCS11_DYN_LIB:
+    raise UnsupportedLibraryError(NO_PKCS11_DYN_LIB_MSG)
+
+  # TODO:  HSM_INFO.check_match(private_key_info)
+  # TODO:  PRIVATE_KEY_INFO.check_match(private_key_info)
+  # TODO:  Check supported mechanism
+  securesystemslib.formats.PASSWORD_SCHEMA.check_match(user_pin)
+
+  # Create a session and login to generate signature using keys stored in hsm
+  session = _setup_session(hsm_info, user_pin)
 
 
-  # # Find the public key handle corresponding to the key_id.
-  # public_key_object = session.findObjects([
-  #     (PyKCS11.CKA_CLASS, PyKCS11.CKO_PUBLIC_KEY),
-  #     (PyKCS11.CKA_ID, public_key_info ])[0]
-
-  # # Retrieve the public key bytes for the required public key
-  # public_key_value, public_key_type = session.getAttributeValue(public_key_object,
-  #     [PyKCS11.CKA_VALUE, PyKCS11.CKA_KEY_TYPE])
+  #### DRY with export pubkey
+  # TODO: KeyError check
+  key_objects = session.findObjects([
+      (PyKCS11.CKA_CLASS, PyKCS11.CKO_PRIVATE_KEY),
+      (PyKCS11.CKA_ID,  hsm_key_id)])
 
 
+  # TODO: is ValueError the right exception here?
+  if len(key_objects) < 1:
+    raise ValueError("cannot find key with CKA_ID '{}' on hsm '{}'".format(
+        hsm_key_id, hsm_info["slot_id"]))
 
-  # if public_key_value:
-  #   public_key_value = bytes(public_key_value)
-  #   # Public key value exported from the HSM is der encoded
-  #   public_key = serialization.load_der_public_key(public_key_value,
-  #       default_backend())
-  # else:
-  #   if PyKCS11.CKK[public_key_type] == 'CKK_RSA':
-  #     public_key_modulus, public_key_exponent = session.getAttributeValue(public_key_object,
-  #         [PyKCS11.CKA_MODULUS, PyKCS11.CKA_PUBLIC_EXPONENT])
-  #     public_key_modulus = _to_hex(public_key_modulus)
-  #     public_key_exponent = _to_hex(public_key_exponent)
-  #     public_numbers = RSAPublicNumbers( int(public_key_exponent,16),
-  #         int(public_key_modulus,16))
-  #     public_key = public_numbers.public_key(default_backend())
-  #   elif PyKCS11.CKK[public_key_type] == 'CKK_EC' or PyKCS11.CKK[public_key_type] == 'CKK_ECDSA':
-  #     raise securesystemslib.exceptions.UnsupportedAlgorithmError(
-  #         "The public key for " + repr(PyKCS11.CKK[public_key_type]) + " cannot be generated "
-  #         "using parameters. This functionality is yet not supported"
-  #     )
-  #   else:
-  #     raise securesystemslib.exceptions.UnsupportedAlgorithmError(
-  #         "The Key type " + repr(PyKCS11.CKK[public_key_type]) + " is currently not supported!")
+  if len(key_objects) > 1:
+    raise ValueError("found multiple keys with CKA_ID '{}' on hsm '{}'".format(
+        hsm_key_id, hsm_info["slot_id"]))
 
-  # logger.error(public_key)
-  # public = public_key.public_bytes(encoding=serialization.Encoding.PEM,
-  #     format=serialization.PublicFormat.SubjectPublicKeyInfo)
-  # # Strip any leading or trailing new line characters.
-  # public = extract_pem(public.decode('utf-8'), private_pem=False)
+  key_object = key_objects.pop()
+  key_type = session.getAttributeValue(key_object, [PyKCS11.CKA_KEY_TYPE])[0]
+  #### DRY END
 
-  # key_value = {'public': public.replace('\r\n', '\n'),
-  #              'private': ''}
+  signature = session.sign(key_object, data, MECHANISMS[mechanism]) # TODO err
 
-  # # Return the public key conforming to the securesystemslib.format.PUBLIC_KEY_SCHEMA
-  # key_dict = {}
-  # key_dict['keyval'] = key_value
+  _teardown_session(session)
 
-  # if PyKCS11.CKK[public_key_type] == 'CKK_RSA':
-  #   key_dict['keytype'] = 'rsa'
-  #   # Currently keeping a default scheme
-  #   # TODO: Decide a way to provide user with options regarding various schemes available
-  #   key_dict['scheme'] = "rsa-pkcs1v15-sha256"
-  # elif PyKCS11.CKK[public_key_type] == 'CKK_EC' or PyKCS11.CKK[public_key_type] == 'CKK_ECDSA':
-  #   key_dict['keytype'] = 'ecdsa'
-  #   key_dict['scheme'] = 'ecdsa-sign'
-  # else:
+  return {
+      "keyid": sslib_key_id,
+      "sig": binascii.hexlify(bytes(signature)).decode("ascii")
+    }
+  # mechanism = None
+  # private_key_object = session.findObjects([(PyKCS11.CKA_CLASS,
+  #     PyKCS11.CKO_PRIVATE_KEY), (PyKCS11.CKA_ID, private_key_info[0])])[0]
+  # key_type = session.getAttributeValue(private_key_object,
+  #     [PyKCS11.CKA_KEY_TYPE])[0]
+
+  # if PyKCS11.CKK[key_type] == 'CKK_RSA':
+  #   mechanism = MECHANISMS["rsa-pkcs1v15-sha256"]
+
+  # elif PyKCS11.CKK[key_type] == 'CKK_EC' or PyKCS11.CKK[key_type] == 'CKK_ECDSA':
+  #   mechanism = MECHANISMS["ecdsa-sign"]
+
+  # if mechanism is None:
   #   raise securesystemslib.exceptions.UnsupportedAlgorithmError(
-  #       "The Key type " + repr(PyKCS11.CKK[public_key_type]) + " is currently not supported!")
-
-  # return key_dict
+  #     "The Key type " + repr(key_type) + " is currently not supported!")
 
 
-# # def create_signature(data, hsm_info, private_key_info, user_pin):
-# #   """
-# #   <Purpose>
-# #     Calculate signature over 'data' using the private key corresponding
-# #     to the 'private_key_info'
+  # signature = session.sign(private_key_object, data, mechanism)
 
-# #     Supported Keys
-# #     1. RSA - rsassa-pss-sha256
-# #     2. ECDSA
+  # signature_dict = {}
+  # # TODO: This is not a key id, change this.
+  # keyid = _to_hex(private_key_info[0])
+  # sig = _to_hex(signature)
 
-# #   <Arguments>
-# #     data:
-# #       bytes over which the signature is to be calculated
-# #       'data' should be encoded/serialized before it is passed here.
+  # signature_dict['keyid'] = keyid
+  # signature_dict['sig'] = sig
 
-# #     private_key_info:
-# #       element from the list returned by the get_private_key_objects()
-
-# #     user_pin:
-# #       PIN for the CKU_USER login.
-
-# #   <Exceptions>
-# #     securesystemslib.exceptions.UnsupportedAlgorithmError, when the
-# #     key type of the 'private_key_handle' is not supported
-
-# #   <Returns>
-# #     A signature dictionary conformant to
-# #     'securesystemslib_format.SIGNATURE_SCHEMA'.
-# #   """
-
-# #   if not HSM_SUPPORT: # pragma: no cover
-# #     raise securesystemslib.exceptions.UnsupportedLibraryError(NO_HSM_MSG)
-
-# #   if not HSM_LIB: # pragma: no cover
-# #     raise securesystemslib.exceptions.UnsupportedLibraryError(NO_HSM_LIB_MSG)
-
-# #   # Create a session and login to generate signature using keys stored in hsm
-# #   session = _create_session(hsm_info)
-# #   _login(session, str(user_pin))
-
-# #   mechanism = None
-# #   private_key_object = session.findObjects([(PyKCS11.CKA_CLASS,
-# #       PyKCS11.CKO_PRIVATE_KEY), (PyKCS11.CKA_ID, private_key_info[0])])[0]
-# #   key_type = session.getAttributeValue(private_key_object,
-# #       [PyKCS11.CKA_KEY_TYPE])[0]
-
-# #   if PyKCS11.CKK[key_type] == 'CKK_RSA':
-# #     mechanism = MECHANISMS["rsa-pkcs1v15-sha256"]
-
-# #   elif PyKCS11.CKK[key_type] == 'CKK_EC' or PyKCS11.CKK[key_type] == 'CKK_ECDSA':
-# #     mechanism = MECHANISMS["ecdsa-sign"]
-
-# #   if mechanism is None:
-# #     raise securesystemslib.exceptions.UnsupportedAlgorithmError(
-# #       "The Key type " + repr(key_type) + " is currently not supported!")
+  # return signature_dict
 
 
-# #   signature = session.sign(private_key_object, data, mechanism)
 
-# #   signature_dict = {}
-# #   # TODO: This is not a key id, change this.
-# #   keyid = _to_hex(private_key_info[0])
-# #   sig = _to_hex(signature)
+def verify_signature(public_key, signature, data):
+  """
+  TODO
 
-# #   signature_dict['keyid'] = keyid
-# #   signature_dict['sig'] = sig
+  """
+  if not CRYPTO:
+    raise UnsupportedLibraryError(NO_CRYPTO_MSG)
 
-# #   return signature_dict
+  # securesystemslib.formats.PUBLIC_KEY_SCHEMA.check_match(public_key)
+  # securesystemslib.formats.SIGNATURE_SCHEMA.check_match(signature)
 
+  if public_key["keytype"] == KEY_TYPE_RSA:
+    crytpo_public_key = RSAPublicNumbers(
+        int(public_key["keyval"]["public"]["e"], 16), int(public_key["keyval"]["public"]["n"], 16)).public_key(
+        default_backend())
+
+    digest_obj = securesystemslib.hash.digest_from_rsa_scheme(
+      public_key["mechanism"],  "pyca_crypto")
+
+    crytpo_public_key.verify(
+        binascii.unhexlify(signature["sig"]), data,
+            padding.PSS(
+                mgf=padding.MGF1(digest_obj.algorithm),
+                salt_length=_SALT_SIZE),
+                digest_obj.algorithm)
+
+    
+
+  # elif key_type == KEY_TYPE_DSA:
+  # elif key_type == KEY_TYPE_ECC:
+
+
+
+  else:
+    raise ValueError("key type '{}' not supported".format(
+        public_key["key_type"]))
+
+
+  return public_key
 
 
 
@@ -435,7 +502,7 @@ def _setup_session(hsm_info, user_pin=None):
   try:
     session = PKCS11.openSession(
         hsm_info["slot_id"],
-        PyKCS11.CKF_SERIAL_SESSION | PyKCS11.CKF_RW_SESSION)
+        PyKCS11.CKF_SERIAL_SESSION | PyKCS11.CKF_RW_SESSION) # TODO: parametrize RW (only needed for tests)
 
     if user_pin is not None:
       session.login(user_pin)
@@ -449,7 +516,6 @@ def _setup_session(hsm_info, user_pin=None):
     else:
       raise
 
-
   return session
 
 
@@ -461,6 +527,7 @@ def _teardown_session(session):
 
     except Exception as e:
       logger.debug(e)
+
 
 if __name__ == "__main__":
   main()
