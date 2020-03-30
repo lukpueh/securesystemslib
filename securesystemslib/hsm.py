@@ -126,7 +126,7 @@ try:
   # Try loading PKCS#11 dynamic library from the path at PYKCS11LIB envvar
   # TODO: We do this to spare the user, who has PYKCS11LIB set, some state
   # handling. Is this too much magic? Should we require an explicit call?
-  _load_pkcs11_lib()
+  # _load_pkcs11_lib()
 
 except ImportError as e:
   # Missing PyKCS11 python library. PKCS11 must remain 'None'.
@@ -496,7 +496,7 @@ def verify_signature(public_key, signature, data):
 
 
 
-def _setup_session(hsm_info, user_pin=None):
+def _setup_session(hsm_info, user_pin=None, user_type=PyKCS11.CKU_USER):
   """Create new hsm session, login if pin is passed and return session object.
   """
   try:
@@ -505,7 +505,7 @@ def _setup_session(hsm_info, user_pin=None):
         PyKCS11.CKF_SERIAL_SESSION | PyKCS11.CKF_RW_SESSION) # TODO: parametrize RW (only needed for tests)
 
     if user_pin is not None:
-      session.login(user_pin)
+      session.login(user_pin, user_type)
 
   except PyKCS11.PyKCS11Error as e:
     if PyKCS11.CKR[e.value] == "CKR_USER_ALREADY_LOGGED_IN":
