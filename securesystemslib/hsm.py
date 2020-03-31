@@ -33,7 +33,7 @@ TODO: keyid and mechanisms: just pass to export_pubkey and create_signature? :)
 
 import logging
 import binascii
-import asn1crypto
+import asn1crypto.keys
 
 import securesystemslib.formats
 import securesystemslib.hash
@@ -50,8 +50,9 @@ try:
   from cryptography.hazmat.backends import default_backend
   from cryptography.hazmat.primitives.asymmetric import padding
   from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicNumbers
+  from cryptography.hazmat.primitives import hashes
   from cryptography.hazmat.primitives.asymmetric.ec import (
-      EllipticCurvePublicNumbers)
+      EllipticCurvePublicKey, SECP256R1, ECDSA)
 
   from cryptography import x509
 
@@ -69,7 +70,7 @@ KEY_TYPE_ECC = "ecc"
 # Signing schemes
 RSASSA_PSS_SHA256 = "rsassa-pss-sha256"
 # RSASSA_PKCS15_SHA256 = "rsa-pkcs1v15-sha256"
-ECDSA_SIGN = "ecdsa-sign"
+ECDSA_SIGN = "ecdsa-sha2-nistp256"
 
 # Module global to hold an instance of PyKCS11.PyKCS11Lib. If it remains 'None'
 # it means that the PyKCS11 library is not available.
@@ -99,13 +100,7 @@ try:
           PyKCS11.CKG_MGF1_SHA256,
           _SALT_SIZE
         ),
-      # RSASSA_PKCS15_SHA256: PyKCS11.Mechanism(
-      #     PyKCS11.CKM_SHA256_RSA_PKCS,
-      #     PyKCS11.CKM_SHA256,
-      #     PyKCS11.CKG_MGF1_SHA256,
-      #     _SALT_SIZE
-      #   ),
-      ECDSA_SIGN: PyKCS11.Mechanism(PyKCS11.CKM_ECDSA)
+      ECDSA_SIGN: PyKCS11.Mechanism(PyKCS11.CKM_ECDSA_SHA384)
     }
 
 
@@ -259,7 +254,7 @@ def get_keys_on_hsm(hsm_info, user_pin=None):
 
 
 
-def export_pubkey(hsm_info, hsm_key_id, mechanism, sslib_key_id):
+def export_pubkey(hsm_info, hsm_key_id, scheme, sslib_key_id):
   """
   <Purpose>
     Export a public key identified by the passed hsm_info and key_info
@@ -296,7 +291,7 @@ def export_pubkey(hsm_info, hsm_key_id, mechanism, sslib_key_id):
   # TODO: HSM_INFO_SCHEMA.check_match(hsm_info)
   # TODO: HSM_KEY_INFO_SCHEMA.check_match(key_info)
   # TODO: keyid check
-  # mechanism check
+  # scheme check
 
   # Create HSM session, without logging in, which is not required for pubkeys
   session = _setup_session(hsm_info)
@@ -334,15 +329,26 @@ def export_pubkey(hsm_info, hsm_key_id, mechanism, sslib_key_id):
         "n": binascii.hexlify(bytes(modulus)).decode("ascii")
       }
 
-  # elif key_type == PyKCS11.CKK_EC:
-    # params, point  = session.getAttributeValue(key_object, [
-    #     PyKCS11.CKA_EC_PARAMS,
-    #     PyKCS11.CKA_EC_POINT
-    #   ]) # TODO: err
-    # CKA_EC_PARAMS (key type)
-    # CKA_EC_POINT (value Q)
+  elif key_type == PyKCS11.CKK_EC:
+    params, point  = session.getAttributeValue(key_object, [
+        PyKCS11.CKA_EC_PARAMS,
+        PyKCS11.CKA_EC_POINT
+      ]) # TODO: err
 
-    # use asn1crypto
+    key_type = KEY_TYPE_ECC
+
+    ec_param_obj = asn1crypto.keys.ECDomainParameters.load(bytes(params))
+
+    oid = ec_param_obj.chosen.dotted
+    print("OID", oid)
+    # TODO: assert oid == MECHANISMS[scheme]["oid"]
+
+    ec_point_obj = asn1crypto.keys.ECPoint().load(bytes(point))
+
+    # TODO: convert to PEM, so that we can use it with securesystemslib.ecdsa_keys.verify_signature
+    public_key_value = {
+        "q": binascii.hexlify(ec_point_obj.native).decode("ascii"),
+      }
 
   # elif key_type == PyKCS11.CKK_DSA:
     # prime, subprime, base, value, = session.getAttributeValue(key_object, [
@@ -367,7 +373,7 @@ def export_pubkey(hsm_info, hsm_key_id, mechanism, sslib_key_id):
   return {
       "keyid": sslib_key_id,
       "keytype": key_type,
-      "mechanism": mechanism,
+      "scheme": scheme,
       "keyval": {
         "public": public_key_value
       }
@@ -375,7 +381,7 @@ def export_pubkey(hsm_info, hsm_key_id, mechanism, sslib_key_id):
 
 
 
-def create_signature(hsm_info, hsm_key_id, user_pin, data, mechanism, sslib_key_id):
+def create_signature(hsm_info, hsm_key_id, user_pin, data, scheme, sslib_key_id):
   """
   TODO
 
@@ -386,9 +392,9 @@ def create_signature(hsm_info, hsm_key_id, user_pin, data, mechanism, sslib_key_
   if not PKCS11_DYN_LIB:
     raise UnsupportedLibraryError(NO_PKCS11_DYN_LIB_MSG)
 
-  # TODO:  HSM_INFO.check_match(private_key_info)
-  # TODO:  PRIVATE_KEY_INFO.check_match(private_key_info)
-  # TODO:  Check supported mechanism
+  # TODO: HSM_INFO.check_match(private_key_info)
+  # TODO: PRIVATE_KEY_INFO.check_match(private_key_info)
+  # TODO: Check supported scheme
   securesystemslib.formats.PASSWORD_SCHEMA.check_match(user_pin)
 
   # Create a session and login to generate signature using keys stored in hsm
@@ -415,43 +421,24 @@ def create_signature(hsm_info, hsm_key_id, user_pin, data, mechanism, sslib_key_
   key_type = session.getAttributeValue(key_object, [PyKCS11.CKA_KEY_TYPE])[0]
   #### DRY END
 
-  signature = session.sign(key_object, data, MECHANISMS[mechanism]) # TODO err
+
+
+  # https://docs.oasis-open.org/pkcs11/pkcs11-curr/v3.0/cs01/pkcs11-curr-v3.0-cs01.html#_Toc30061178
+  signature = session.sign(key_object, data, MECHANISMS[scheme]) # TODO err
 
   _teardown_session(session)
 
+
+  # FIXME: Creates an ASN.1 encoded Dss-Sig-Value (required by pyca/cryptography)
+  r = signature[32:]
+  s = signature[:32]
+  signature = cryptography.hazmat.primitives.asymmetric.utils.encode_dss_signature(r, s)
+
   return {
       "keyid": sslib_key_id,
-      "sig": binascii.hexlify(bytes(signature)).decode("ascii")
+      "sig": signature
+      # "sig": binascii.hexlify(bytes(signature)).decode("ascii")
     }
-  # mechanism = None
-  # private_key_object = session.findObjects([(PyKCS11.CKA_CLASS,
-  #     PyKCS11.CKO_PRIVATE_KEY), (PyKCS11.CKA_ID, private_key_info[0])])[0]
-  # key_type = session.getAttributeValue(private_key_object,
-  #     [PyKCS11.CKA_KEY_TYPE])[0]
-
-  # if PyKCS11.CKK[key_type] == 'CKK_RSA':
-  #   mechanism = MECHANISMS["rsa-pkcs1v15-sha256"]
-
-  # elif PyKCS11.CKK[key_type] == 'CKK_EC' or PyKCS11.CKK[key_type] == 'CKK_ECDSA':
-  #   mechanism = MECHANISMS["ecdsa-sign"]
-
-  # if mechanism is None:
-  #   raise securesystemslib.exceptions.UnsupportedAlgorithmError(
-  #     "The Key type " + repr(key_type) + " is currently not supported!")
-
-
-  # signature = session.sign(private_key_object, data, mechanism)
-
-  # signature_dict = {}
-  # # TODO: This is not a key id, change this.
-  # keyid = _to_hex(private_key_info[0])
-  # sig = _to_hex(signature)
-
-  # signature_dict['keyid'] = keyid
-  # signature_dict['sig'] = sig
-
-  # return signature_dict
-
 
 
 def verify_signature(public_key, signature, data):
@@ -467,11 +454,12 @@ def verify_signature(public_key, signature, data):
 
   if public_key["keytype"] == KEY_TYPE_RSA:
     crytpo_public_key = RSAPublicNumbers(
-        int(public_key["keyval"]["public"]["e"], 16), int(public_key["keyval"]["public"]["n"], 16)).public_key(
+        int(public_key["keyval"]["public"]["e"], 16),
+        int(public_key["keyval"]["public"]["n"], 16)).public_key(
         default_backend())
 
     digest_obj = securesystemslib.hash.digest_from_rsa_scheme(
-      public_key["mechanism"],  "pyca_crypto")
+      public_key["scheme"],  "pyca_crypto")
 
     crytpo_public_key.verify(
         binascii.unhexlify(signature["sig"]), data,
@@ -480,19 +468,26 @@ def verify_signature(public_key, signature, data):
                 salt_length=_SALT_SIZE),
                 digest_obj.algorithm)
 
-    
+
 
   # elif key_type == KEY_TYPE_DSA:
-  # elif key_type == KEY_TYPE_ECC:
+  elif public_key["keytype"] == KEY_TYPE_ECC:
 
+    # In verify
+    #TODO: make curve variable
+    curve = SECP256R1
+    crypto_public_key = EllipticCurvePublicKey.from_encoded_point(
+        curve(), binascii.unhexlify(public_key["keyval"]["public"]["q"]))
+
+    # TODO: make hash algorithm variable
+    crypto_public_key.verify(
+      signature["sig"], data, ECDSA(hashes.SHA256()))
 
 
   else:
     raise ValueError("key type '{}' not supported".format(
         public_key["key_type"]))
 
-
-  return public_key
 
 
 
