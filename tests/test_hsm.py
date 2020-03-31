@@ -32,6 +32,7 @@ if not six.PY2:
 logger = logging.getLogger(__name__)
 
 
+
 #  TODO: switch to envvar?
 PKCS11LIB = "/usr/local/lib/softhsm/libsofthsm2.so"
 
@@ -65,27 +66,31 @@ class SoftHSMTestCase(unittest.TestCase):
     os.chdir(cls.test_dir)
 
     with open("softhsm2.conf", "w") as f:
-      f.write("directories.tokendir = " + cls.test_dir)
+      f.write("directories.tokendir = " + os.path.join(cls.test_dir, ""))
 
-    os.environ["SOFTHSM2_CONF"] = cls.test_dir
+    os.environ["SOFTHSM2_CONF"] = os.path.join(cls.test_dir, "softhsm2.conf")
 
+
+    # Initializing the HSM
     hsm.load_pkcs11_lib(PKCS11LIB)
-    hsm_infos = hsm.get_hsms()
-    hsm_info = hsm_infos.pop()
+    available_hsm = hsm.get_hsms().pop()
+    hsm.PKCS11.initToken(available_hsm["slot_id"], cls.so_pin, cls.hsm_label)
 
-    hsm.PKCS11.initToken(hsm_info["slot_id"], cls.so_pin, cls.hsm_label)
-    breakpoint()
-    session = hsm._setup_session(hsm_info, cls.so_pin, PyKCS11.CKU_SO)
+    # After initializing the SoftHSM, the slot number changes (get_hsms again)
+    available_hsm = hsm.get_hsms().pop()
+    session = hsm._setup_session(available_hsm, cls.so_pin, PyKCS11.CKU_SO)
     session.initPin(cls.user_pin)
     hsm._teardown_session(session)
 
 
+
   @classmethod
   def tearDownClass(cls):
-    print("going down")
     os.chdir(cls.original_cwd)
     shutil.rmtree(cls.test_dir)
     del os.environ["SOFTHSM2_CONF"]
+
+
 
 
 class TestECDSA(SoftHSMTestCase):
@@ -94,15 +99,11 @@ class TestECDSA(SoftHSMTestCase):
     super(TestECDSA, cls).setUpClass()
 
 
+    available_hsm = hsm.get_hsms().pop()
+    session = hsm._setup_session(available_hsm, cls.user_pin)
 
-    hsm_infos = hsm.get_hsms()
-    from pprint import pprint
-    # pprint(hsm_infos)
-    hsm_info = hsm_infos.pop()
-    pprint(hsm_info)
-    session = hsm._setup_session(hsm_info, cls.user_pin)
 
-    # TODO: get supported curves from hsm module
+   # TODO: get supported curves from hsm module
     # "ecdsa-sha2-nistp256", "ecdsa-sha2-nistp384"
     # CKM_ECDSA_SHA256, CKM_ECDSA_SHA384
     curves = [
@@ -145,8 +146,6 @@ class TestECDSA(SoftHSMTestCase):
           ec_public_template, ec_private_template,
           mecha=PyKCS11.MechanismECGENERATEKEYPAIR)
 
-      hsm._teardown_session(session)
-
       cls.keys = {
         curve: {
           "hsm_keyid": key_id,
@@ -155,14 +154,12 @@ class TestECDSA(SoftHSMTestCase):
         }
       }
 
+    hsm._teardown_session(session)
 
-  @classmethod
-  def tearDownClass(cls):
-    super(TestECDSA, cls).tearDownClass()
 
 
   def test_foo(self):
-    print(cls.hsm_info)
+    print("foo")
 
 
 
