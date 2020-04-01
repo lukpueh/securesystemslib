@@ -326,7 +326,9 @@ def export_pubkey(hsm_info, hsm_key_id, scheme, sslib_key_id):
         PyKCS11.CKA_EC_POINT
       ]) # TODO: err
 
-    key_type = KEY_TYPE_ECC
+
+    # FIXME: don't hardcode
+    keytype = scheme
 
     ec_param_obj = asn1crypto.keys.ECDomainParameters.load(bytes(params))
     oid = ec_param_obj.chosen.dotted
@@ -342,7 +344,7 @@ def export_pubkey(hsm_info, hsm_key_id, scheme, sslib_key_id):
 
     public_key_value = crypto_public_key.public_bytes(
         serialization.Encoding.PEM,
-        serialization.PublicFormat.SubjectPublicKeyInfo)
+        serialization.PublicFormat.SubjectPublicKeyInfo).decode()
 
     # public_key_value = {
     #     "q": binascii.hexlify(ec_point_obj.native).decode("ascii"),
@@ -383,7 +385,7 @@ def export_pubkey(hsm_info, hsm_key_id, scheme, sslib_key_id):
   #TODO: method?
   return {
       "keyid": sslib_key_id,
-      "keytype": key_type,
+      "keytype": keytype,
       "scheme": scheme,
       "keyval": {
         "public": public_key_value
@@ -397,6 +399,9 @@ def create_signature(hsm_info, hsm_key_id, user_pin, data, scheme, sslib_key_id)
   TODO
 
   """
+  if not CRYPTO:
+    raise UnsupportedLibraryError(NO_CRYPTO_MSG)
+
   if PKCS11 is None:
     raise UnsupportedLibraryError(NO_PKCS11_PY_LIB_MSG)
 
@@ -450,7 +455,7 @@ def create_signature(hsm_info, hsm_key_id, user_pin, data, scheme, sslib_key_id)
 
 
   # Create an ASN.1 encoded Dss-Sig-Value to be used with pyca/cryptography
-  dss_sig_value = encode_dss_signature(r, s)
+  dss_sig_value = binascii.hexlify(encode_dss_signature(r, s)).decode("ascii")
 
   return {
       "keyid": sslib_key_id,
