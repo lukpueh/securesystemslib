@@ -345,11 +345,6 @@ def export_pubkey(hsm_info, hsm_key_id, scheme, sslib_key_id):
         serialization.PublicFormat.SubjectPublicKeyInfo)
 
 
-
-    # TODO: convert to PEM, so that we can use it with securesystemslib.ecdsa_keys.verify_signature
-    public_key_value = {
-        "q": binascii.hexlify(ec_point_obj.native).decode("ascii"),
-      }
   # elif key_type == PyKCS11.CKK_RSA:
   #   modulus, exponent  = session.getAttributeValue(key_object, [
   #       PyKCS11.CKA_MODULUS,
