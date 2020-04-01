@@ -282,6 +282,9 @@ def export_pubkey(hsm_info, hsm_key_id, scheme, sslib_key_id):
     A public key dictionary that conforms to 'PUBLIC_KEY_SCHEMA'.
 
   """
+  if not CRYPTO:
+    raise UnsupportedLibraryError(NO_CRYPTO_MSG)
+
   if PKCS11 is None:
     raise UnsupportedLibraryError(NO_PKCS11_PY_LIB_MSG)
 
@@ -338,12 +341,22 @@ def export_pubkey(hsm_info, hsm_key_id, scheme, sslib_key_id):
     key_type = KEY_TYPE_ECC
 
     ec_param_obj = asn1crypto.keys.ECDomainParameters.load(bytes(params))
-
     oid = ec_param_obj.chosen.dotted
     print("OID", oid)
     # TODO: assert oid == MECHANISMS[scheme]["oid"]
-
     ec_point_obj = asn1crypto.keys.ECPoint().load(bytes(point))
+
+    #TODO: make curve variable
+    curve = SECP256R1
+    crypto_public_key = EllipticCurvePublicKey.from_encoded_point(
+        curve(), ec_point_obj.native)
+
+
+    public_key_value = crypto_public_key.public_bytes(
+        serialization.Encoding.PEM,
+        serialization.PublicFormat.SubjectPublicKeyInfo)
+
+
 
     # TODO: convert to PEM, so that we can use it with securesystemslib.ecdsa_keys.verify_signature
     public_key_value = {
