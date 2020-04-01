@@ -101,7 +101,7 @@ try:
           PyKCS11.CKG_MGF1_SHA256,
           _SALT_SIZE
         ),
-      ECDSA_SIGN: PyKCS11.Mechanism(PyKCS11.CKM_ECDSA_SHA384)
+      ECDSA_SIGN: PyKCS11.Mechanism(PyKCS11.CKM_ECDSA_SHA256)
     }
 
 
@@ -344,6 +344,9 @@ def export_pubkey(hsm_info, hsm_key_id, scheme, sslib_key_id):
         serialization.Encoding.PEM,
         serialization.PublicFormat.SubjectPublicKeyInfo)
 
+    # public_key_value = {
+    #     "q": binascii.hexlify(ec_point_obj.native).decode("ascii"),
+    #   }
 
   # elif key_type == PyKCS11.CKK_RSA:
   #   modulus, exponent  = session.getAttributeValue(key_object, [
@@ -438,8 +441,13 @@ def create_signature(hsm_info, hsm_key_id, user_pin, data, scheme, sslib_key_id)
   # values r and s, both represented as an octet string of equal length of at
   # most nLen with the most significant byte first (i.e. big endian)
   # https://docs.oasis-open.org/pkcs11/pkcs11-curr/v3.0/cs01/pkcs11-curr-v3.0-cs01.html#_Toc30061178
-  r = int.from_bytes(signature[len(signature) / 2:], byteorder="big")
-  s = int.from_bytes(signature[:len(signature) / 2], byteorder="big")
+
+  r_bytes = signature[:int(len(signature) / 2)]
+  s_bytes = signature[int(len(signature) / 2):]
+
+  r = int.from_bytes(r_bytes, byteorder="big")
+  s = int.from_bytes(s_bytes, byteorder="big")
+
 
   # Create an ASN.1 encoded Dss-Sig-Value to be used with pyca/cryptography
   dss_sig_value = encode_dss_signature(r, s)
