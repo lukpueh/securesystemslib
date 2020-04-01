@@ -350,20 +350,20 @@ def export_pubkey(hsm_info, hsm_key_id, scheme, sslib_key_id):
     public_key_value = {
         "q": binascii.hexlify(ec_point_obj.native).decode("ascii"),
       }
-  elif key_type == PyKCS11.CKK_RSA:
-    modulus, exponent  = session.getAttributeValue(key_object, [
-        PyKCS11.CKA_MODULUS,
-        PyKCS11.CKA_PUBLIC_EXPONENT
-      ]) # TODO: err
+  # elif key_type == PyKCS11.CKK_RSA:
+  #   modulus, exponent  = session.getAttributeValue(key_object, [
+  #       PyKCS11.CKA_MODULUS,
+  #       PyKCS11.CKA_PUBLIC_EXPONENT
+  #     ]) # TODO: err
 
-    # TODO: Use right scheme and create constants
-    key_type = KEY_TYPE_RSA
+  #   # TODO: Use right scheme and create constants
+  #   key_type = KEY_TYPE_RSA
 
-    # TODO: convert public numbers ?
-    public_key_value = {
-        "e": binascii.hexlify(bytes(exponent)).decode("ascii"),
-        "n": binascii.hexlify(bytes(modulus)).decode("ascii")
-      }
+  #   # TODO: convert public numbers ?
+  #   public_key_value = {
+  #       "e": binascii.hexlify(bytes(exponent)).decode("ascii"),
+  #       "n": binascii.hexlify(bytes(modulus)).decode("ascii")
+  #     }
   # elif key_type == PyKCS11.CKK_DSA:
     # prime, subprime, base, value, = session.getAttributeValue(key_object, [
     #     PyKCS11.CKA_PRIME,
