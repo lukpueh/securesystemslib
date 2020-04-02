@@ -23,6 +23,7 @@ import six
 
 import securesystemslib.exceptions
 import securesystemslib.formats
+import securesystemslib.keys
 from asn1crypto.keys import ECDomainParameters, NamedCurve
 
 if not six.PY2:
@@ -172,6 +173,33 @@ class TestECDSA(SoftHSMTestCase):
     # Verify signature
     result = hsm.verify_signature(public_key, signature, data)
     print(result)
+
+
+
+class TestECDSAOnYubiKey(unittest.TestCase):
+  @classmethod
+  def setUpClass(cls):
+    cls.user_pin = os.environ["YUBI_PIN"]
+
+    hsm.load_pkcs11_lib(
+        "/usr/local/Cellar/yubico-piv-tool/2.0.0/lib/libykcs11.dylib")
+    cls.hsm_info = hsm.get_hsms().pop()
+    cls.sslib_key_id = "123456"
+    cls.data = b"Hello world"
+
+  def test_keys(self):
+    scheme = "ecdsa-sha2-nistp256"
+    hsm_key_id = (0x02, )
+
+    signature = hsm.create_signature(
+        self.hsm_info, hsm_key_id, self.user_pin, self.data, scheme,
+        self.sslib_key_id)
+
+    public_key = hsm.export_pubkey(
+        self.hsm_info, hsm_key_id, scheme, self.sslib_key_id)
+
+    securesystemslib.keys.verify_signature(
+        public_key, signature, self.data)
 
 
 
