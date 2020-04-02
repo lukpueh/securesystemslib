@@ -153,7 +153,6 @@ class TestECDSA(SoftHSMTestCase):
     hsm._teardown_session(session)
 
 
-
   def test_keys(self):
     scheme = "ecdsa-sha2-nistp256"
     hsm_key_id = (0x00, )
@@ -191,15 +190,16 @@ class TestECDSAOnYubiKey(unittest.TestCase):
     scheme = "ecdsa-sha2-nistp256"
     hsm_key_id = (0x02, )
 
-    signature = hsm.create_signature(
-        self.hsm_info, hsm_key_id, self.user_pin, self.data, scheme,
-        self.sslib_key_id)
-
     public_key = hsm.export_pubkey(
         self.hsm_info, hsm_key_id, scheme, self.sslib_key_id)
 
-    securesystemslib.keys.verify_signature(
-        public_key, signature, self.data)
+    # signature = hsm.create_signature(
+    #     self.hsm_info, hsm_key_id, self.user_pin, self.data, scheme,
+    #     self.sslib_key_id)
+
+
+    # securesystemslib.keys.verify_signature(
+    #     public_key, signature, self.data)
 
 
 
