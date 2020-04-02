@@ -91,26 +91,6 @@ try:
       ECDSA_SIGN: PyKCS11.Mechanism(PyKCS11.CKM_ECDSA_SHA256)
     }
 
-
-  def _load_pkcs11_lib(path=None):
-    """TODO  """
-    global PKCS11_DYN_LIB
-    try:
-      # If path is not passed PyKCS11 consults the PYKCS11LIB env var
-      PKCS11.load(path)
-      PKCS11_DYN_LIB = True
-
-    # TODO: Should we catch any exception
-    except PyKCS11.PyKCS11Error as e:
-      PKCS11_DYN_LIB = False
-      # TODO: Add message "Could not load + e + NO_PKCS11_DYN_LIB_MSG
-      raise PKCS11DynamicLibraryLoadingError(e)
-
-  # Try loading PKCS#11 dynamic library from the path at PYKCS11LIB envvar
-  # TODO: We do this to spare the user, who has PYKCS11LIB set, some state
-  # handling. Is this too much magic? Should we require an explicit call?
-  # _load_pkcs11_lib()
-
 except ImportError as e:
   # Missing PyKCS11 python library. PKCS11 must remain 'None'.
   logger.debug(e)
@@ -152,7 +132,18 @@ def load_pkcs11_lib(path=None):
   if path is not None:
     securesystemslib.formats.PATH_SCHEMA.check_match(path)
 
-  _load_pkcs11_lib(path)
+  global PKCS11_DYN_LIB
+
+  try:
+    # If path is not passed PyKCS11 consults the PYKCS11LIB env var
+    PKCS11.load(path)
+    PKCS11_DYN_LIB = True
+
+  # TODO: Should we catch any exception
+  except PyKCS11.PyKCS11Error as e:
+    PKCS11_DYN_LIB = False
+    # TODO: Add message "Could not load + e + NO_PKCS11_DYN_LIB_MSG
+    raise PKCS11DynamicLibraryLoadingError(e)
 
 
 def get_hsms():
