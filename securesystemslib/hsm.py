@@ -89,7 +89,6 @@ ECDSA_SHA2_NISTP256 = "ecdsa-sha2-nistp256"
 if PKCS11 is not None and CRYPTO:
   SIGNING_SCHEMES = {
     ECDSA_SHA2_NISTP256: {
-      "key_type": PyKCS11.CKK_EC,
       "mechanism": PyKCS11.Mechanism(PyKCS11.CKM_ECDSA_SHA256),
       "curve": SECP256R1
       }
@@ -300,11 +299,11 @@ def export_pubkey(hsm_info, hsm_key_id, scheme, sslib_key_id):
   hsm_key_type = session.getAttributeValue(key_object, [PyKCS11.CKA_KEY_TYPE])[0] # TODO: err
 
 
-  if hsm_key_type != scheme_info["key_type"]:
+  if hsm_key_type != PyKCS11.CKK_EC:
     raise ValueError("passed scheme '{}' requires a key of type '{}', "
         "found key of type '{}' {}".format(
         scheme,
-        PyKCS11.CKK[scheme_info["key_type"]],
+        PyKCS11.CKK[PyKCS11.CKK_EC],
         PyKCS11.CKK.get(hsm_key_type, None),
         _for_key_on_hsm))
 
@@ -365,28 +364,25 @@ def create_signature(hsm_info, hsm_key_id, user_pin, data, scheme, sslib_key_id)
   # Create a session and login to generate signature using keys stored in hsm
   session = _setup_session(hsm_info, user_pin)
 
+
   #### DRY with export pubkey
   # TODO: KeyError check
   key_objects = session.findObjects([
       (PyKCS11.CKA_CLASS, PyKCS11.CKO_PRIVATE_KEY),
       (PyKCS11.CKA_ID,  hsm_key_id)])
 
-  # TODO: is ValueError the right exception here?
-  if len(key_objects) < 1:
-    raise ValueError("cannot find key with CKA_ID '{}' on hsm '{}'".format(
-        hsm_key_id, hsm_info["slot_id"]))
-
-  if len(key_objects) > 1:
-    raise ValueError("found multiple keys with CKA_ID '{}' on hsm '{}'".format(
-        hsm_key_id, hsm_info["slot_id"]))
-
   key_object = key_objects.pop()
   key_type = session.getAttributeValue(key_object, [PyKCS11.CKA_KEY_TYPE])[0]
+
+  # Including checks from above
+
   #### DRY END
 
-  # https://docs.oasis-open.org/pkcs11/pkcs11-curr/v3.0/cs01/pkcs11-curr-v3.0-cs01.html#_Toc30061178
-  signature = session.sign(key_object, data, MECHANISMS[scheme]) # TODO err
 
+
+
+  # https://docs.oasis-open.org/pkcs11/pkcs11-curr/v3.0/cs01/pkcs11-curr-v3.0-cs01.html#_Toc30061178
+  signature = session.sign(key_object, data, SIGNING_SCHEMES[scheme]["mechanism"]) # TODO err
   _teardown_session(session)
 
   # The PKCS11 signature octets correspond to the concatenation of the ECDSA
