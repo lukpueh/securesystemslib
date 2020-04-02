@@ -65,7 +65,7 @@ try:
   from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicNumbers
   from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
   from cryptography.hazmat.primitives.asymmetric.ec import (
-      EllipticCurvePublicKey, SECP256R1, ECDSA)
+      EllipticCurvePublicKey, SECP256R1, SECP384R1, ECDSA)
 
   from cryptography import x509
 
@@ -81,16 +81,19 @@ except ImportError as e:
   # Missing PyKCS11 python library. PKCS11 must remain 'None'.
   logger.debug(e)
 
-
-
-# TODO: Create global sslib constant
+# TODO: Create securesystemslib-wide constants and use them everywhere
 ECDSA_SHA2_NISTP256 = "ecdsa-sha2-nistp256"
+ECDSA_SHA2_NISTP384 = "ecdsa-sha2-nistp384"
 
 if PKCS11 is not None and CRYPTO:
   SIGNING_SCHEMES = {
     ECDSA_SHA2_NISTP256: {
       "mechanism": PyKCS11.Mechanism(PyKCS11.CKM_ECDSA_SHA256),
       "curve": SECP256R1
+      },
+    ECDSA_SHA2_NISTP384: {
+      "mechanism": PyKCS11.Mechanism(PyKCS11.CKM_ECDSA_SHA384),
+      "curve": SECP384R1
       }
     }
 
@@ -125,17 +128,19 @@ def load_pkcs11_lib(path=None):
   if PKCS11 is None:
     raise UnsupportedLibraryError(NO_PKCS11_PY_LIB_MSG)
 
-  if path is not None:
-    securesystemslib.formats.PATH_SCHEMA.check_match(path)
-
   global PKCS11_DYN_LIB
 
   try:
-    # If path is not passed PyKCS11 consults the PYKCS11LIB env var
-    PKCS11.load(path)
+     # If path is not passed PyKCS11 consults the PYKCS11LIB env var
+    if path is None:
+      PKCS11.load()
+
+    else:
+      securesystemslib.formats.PATH_SCHEMA.check_match(path)
+      PKCS11.load(path)
+
     PKCS11_DYN_LIB = True
 
-  # TODO: Should we catch any exception
   except PyKCS11.PyKCS11Error as e:
     PKCS11_DYN_LIB = False
     # TODO: Add message "Could not load + e + NO_PKCS11_DYN_LIB_MSG
@@ -178,7 +183,7 @@ def get_keys_on_hsm(hsm_info, user_pin=None):
   """
   <Purpose>
     Get handles of public and private keys stored on the HSM.
-    To get private key handles login required before using this method.
+    To get private key handles login is required before using this method.
 
   <Argument>
     hsm_info:
