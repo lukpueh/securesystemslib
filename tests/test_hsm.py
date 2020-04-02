@@ -24,11 +24,11 @@ import six
 import securesystemslib.exceptions
 import securesystemslib.formats
 import securesystemslib.keys
+import securesystemslib.hash
 from asn1crypto.keys import ECDomainParameters, NamedCurve
 
-if not six.PY2:
-  import PyKCS11
-  from securesystemslib import hsm
+import PyKCS11
+import securesystemslib.hsm
 
 logger = logging.getLogger(__name__)
 
@@ -74,15 +74,17 @@ class SoftHSMTestCase(unittest.TestCase):
 
 
     # Initializing the HSM
-    hsm.load_pkcs11_lib(PKCS11LIB)
-    available_hsm = hsm.get_hsms().pop()
-    hsm.PKCS11.initToken(available_hsm["slot_id"], cls.so_pin, cls.hsm_label)
+    securesystemslib.hsm.load_pkcs11_lib(PKCS11LIB)
+    available_hsm = securesystemslib.hsm.get_hsms().pop()
+    securesystemslib.hsm.PKCS11.initToken(
+        available_hsm["slot_id"], cls.so_pin, cls.hsm_label)
 
     # After initializing the SoftHSM, the slot number changes (get_hsms again)
-    cls.hsm_info = hsm.get_hsms().pop()
-    session = hsm._setup_session(cls.hsm_info, cls.so_pin, PyKCS11.CKU_SO)
+    cls.hsm_info = securesystemslib.hsm.get_hsms().pop()
+    session = securesystemslib.hsm._setup_session(
+        cls.hsm_info, cls.so_pin, PyKCS11.CKU_SO)
     session.initPin(cls.user_pin)
-    hsm._teardown_session(session)
+    securesystemslib.hsm._teardown_session(session)
 
 
 
@@ -100,13 +102,16 @@ class TestECDSA(SoftHSMTestCase):
   def setUpClass(cls):
     super(TestECDSA, cls).setUpClass()
 
-    session = hsm._setup_session(cls.hsm_info, cls.user_pin)
-   # TODO: get supported curves from hsm module
-    # "ecdsa-sha2-nistp256", "ecdsa-sha2-nistp384"
-    # CKM_ECDSA_SHA256, CKM_ECDSA_SHA384
+    session = securesystemslib.hsm._setup_session(cls.hsm_info, cls.user_pin)
+
+    # Patch mechanism securesystemslib signing schemes
+    securesystemslib.hsm.SIGNING_SCHEMES[securesystemslib.hsm.ECDSA_SHA2_NISTP256]["mechanism"] = \
+        PyKCS11.Mechanism(PyKCS11.CKM_ECDSA)
+
+
     curves = [
       ((0x00, ), "secp256r1"),
-      ((0x01, ),"secp384r1")
+      # ((0x01, ), "secp384r1")
     ]
 
     cls.keys = {}
@@ -150,8 +155,15 @@ class TestECDSA(SoftHSMTestCase):
         }
       }
 
-    hsm._teardown_session(session)
+    securesystemslib.hsm._teardown_session(session)
 
+  @classmethod
+  def tearDownClass(cls):
+    super(TestECDSA, cls).tearDownClass()
+
+    # Restore mechanism for TestECDSAOnYubiKey to work
+    securesystemslib.hsm.SIGNING_SCHEMES[securesystemslib.hsm.ECDSA_SHA2_NISTP256]["mechanism"] = \
+        PyKCS11.Mechanism(PyKCS11.CKM_ECDSA_SHA256)
 
   def test_keys(self):
     scheme = "ecdsa-sha2-nistp256"
@@ -159,19 +171,24 @@ class TestECDSA(SoftHSMTestCase):
     sslib_key_id = "123456"
     data = b"Hello world"
 
-    # Create a signature
-    signature = hsm.create_signature(
-        self.hsm_info, hsm_key_id, self.user_pin, data, scheme, sslib_key_id)
-    print(signature)
-
-    # Export corresponding public key
-    public_key = hsm.export_pubkey(
+    public_key = securesystemslib.hsm.export_pubkey(
         self.hsm_info, hsm_key_id, scheme, sslib_key_id)
     print(public_key)
 
+
+    # Create a signature
+    # We have to prehash the data for SoftHSM, which only supports CKM_ECDSA
+    # mechanism
+    hasher = securesystemslib.hash.digest(algorithm="sha256")
+    hasher.update(data)
+    pre_hashed_data = hasher.digest()
+
+    signature = securesystemslib.hsm.create_signature(
+        self.hsm_info, hsm_key_id, self.user_pin, pre_hashed_data, scheme, sslib_key_id)
+
     # Verify signature
-    result = hsm.verify_signature(public_key, signature, data)
-    print(result)
+    result = securesystemslib.keys.verify_signature(public_key, signature, data)
+    self.assertTrue(result)
 
 
 
@@ -180,9 +197,9 @@ class TestECDSAOnYubiKey(unittest.TestCase):
   def setUpClass(cls):
     cls.user_pin = os.environ["YUBI_PIN"]
 
-    hsm.load_pkcs11_lib(
+    securesystemslib.hsm.load_pkcs11_lib(
         "/usr/local/Cellar/yubico-piv-tool/2.0.0/lib/libykcs11.dylib")
-    cls.hsm_info = hsm.get_hsms().pop()
+    cls.hsm_info = securesystemslib.hsm.get_hsms().pop()
     cls.sslib_key_id = "123456"
     cls.data = b"Hello world"
 
@@ -190,16 +207,16 @@ class TestECDSAOnYubiKey(unittest.TestCase):
     scheme = "ecdsa-sha2-nistp256"
     hsm_key_id = (0x02, )
 
-    public_key = hsm.export_pubkey(
+    public_key = securesystemslib.hsm.export_pubkey(
         self.hsm_info, hsm_key_id, scheme, self.sslib_key_id)
 
-    # signature = hsm.create_signature(
-    #     self.hsm_info, hsm_key_id, self.user_pin, self.data, scheme,
-    #     self.sslib_key_id)
+    signature = securesystemslib.hsm.create_signature(
+        self.hsm_info, hsm_key_id, self.user_pin, self.data, scheme,
+        self.sslib_key_id)
 
-
-    # securesystemslib.keys.verify_signature(
-    #     public_key, signature, self.data)
+    result = securesystemslib.keys.verify_signature(
+        public_key, signature, self.data)
+    self.assertTrue(result)
 
 
 

@@ -315,8 +315,8 @@ def export_pubkey(hsm_info, hsm_key_id, scheme, sslib_key_id):
   keytype = scheme
   ec_param_obj = asn1crypto.keys.ECDomainParameters.load(bytes(params))
   if ec_param_obj.chosen.native != scheme_info["curve"].name:
-    raise ValueError("passed scheme '{}' requires curve '{}', found curve "
-        "'{}' {}".format(
+    raise ValueError("passed scheme '{}' requires key on curve '{}', found "
+        "key on curve '{}' {}".format(
         scheme,
         scheme_info["curve"].name,
         ec_param_obj.chosen.native,
