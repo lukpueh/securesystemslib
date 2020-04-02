@@ -42,9 +42,21 @@ from securesystemslib.exceptions import (
 
 logger = logging.getLogger(__name__)
 
+#Boolean to indicate if optional pyca cryptography library is available
 CRYPTO = True
-# TODO: Fix error message
+# Module global to hold an instance of PyKCS11.PyKCS11Lib. If it remains 'None'
+# it means that the PyKCS11 library is not available.
+PKCS11 = None
+# Boolean to indicate if we have loaded the required dynamic library on the
+# 'PKCS11' instance. (Note: It would would nicer to get this information from
+# the object, but there doesn't seem to be a straight-forward way to to this.)
+PKCS11_DYN_LIB = False
+
+# TODO: write proper message / usage instructions for load
 NO_CRYPTO_MSG = "This operations requires cryptography."
+NO_PKCS11_PY_LIB_MSG = "HSM support requires PyKCS11 library"
+NO_PKCS11_DYN_LIB_MSG = "HSM support requires PKCS11 shared object"
+
 try:
   from cryptography.hazmat.backends import default_backend
   from cryptography.hazmat.primitives import serialization
@@ -60,44 +72,29 @@ try:
 except ImportError:
   CRYPTO = False
 
-
-# Key types
-KEY_TYPE_ECC = "ecc"
-
-ECDSA_SIGN = "ecdsa-sha2-nistp256"
-
-# Module global to hold an instance of PyKCS11.PyKCS11Lib. If it remains 'None'
-# it means that the PyKCS11 library is not available.
-PKCS11 = None
-
-# Boolean to indicate if we have loaded the required dynamic library on the
-# 'PKCS11' instance. (Note: It would would nicer to get this information from
-# the object, but there doesn't seem to be a straight-forward way to to this.)
-PKCS11_DYN_LIB = False
-
-# TODO: write proper message / usage instructions for load
-NO_PKCS11_PY_LIB_MSG = "HSM support requires PyKCS11 library"
-NO_PKCS11_DYN_LIB_MSG = "HSM support requires PKCS11 shared object"
-
-# Import python wrapper for PKCS#11 to communicate with the tokens
 try:
+  # Import python wrapper for PKCS#11 to communicate with the tokens
   import PyKCS11
   PKCS11 = PyKCS11.PyKCS11Lib()
-
-  # Create mechanisms constants
-  # TODO: Check mechanism names / what are mechanisms again?
-  # TODO: Check mechanism flexibility
-  MECHANISMS = {
-      ECDSA_SIGN: PyKCS11.Mechanism(PyKCS11.CKM_ECDSA_SHA256)
-    }
 
 except ImportError as e:
   # Missing PyKCS11 python library. PKCS11 must remain 'None'.
   logger.debug(e)
 
-except PKCS11DynamicLibraryLoadingError as e:
-  # Missing PKCS#11 dynamic library. PKCS11_DYN_LIB must remain 'False'.
-  logger.debug(e)
+
+
+# TODO: Create global sslib constant
+ECDSA_SHA2_NISTP256 = "ecdsa-sha2-nistp256"
+
+if PKCS11 is not None and CRYPTO:
+  SIGNING_SCHEMES = {
+    ECDSA_SHA2_NISTP256: {
+      "key_type": PyKCS11.CKK_EC,
+      "mechanism": PyKCS11.Mechanism(PyKCS11.CKM_ECDSA_SHA256),
+      "curve": SECP256R1
+      }
+    }
+
 
 
 
@@ -270,6 +267,12 @@ def export_pubkey(hsm_info, hsm_key_id, scheme, sslib_key_id):
   if not PKCS11_DYN_LIB:
     raise UnsupportedLibraryError(NO_PKCS11_DYN_LIB_MSG)
 
+  if scheme not in SIGNING_SCHEMES.keys():
+    raise ValueError("passed scheme {} not supported. choose one of {}".format(
+        scheme, ",".join(SIGNING_SCHEMES.keys())))
+
+  scheme_info = SIGNING_SCHEMES[scheme]
+
   # TODO: HSM_INFO_SCHEMA.check_match(hsm_info)
   # TODO: HSM_KEY_INFO_SCHEMA.check_match(key_info)
   # TODO: keyid check
@@ -283,58 +286,55 @@ def export_pubkey(hsm_info, hsm_key_id, scheme, sslib_key_id):
       (PyKCS11.CKA_CLASS, PyKCS11.CKO_PUBLIC_KEY),
       (PyKCS11.CKA_ID, hsm_key_id)])
 
+  _for_key_on_hsm = "for keyid '{}' on hsm '{}'".format(
+      hsm_key_id, hsm_info["slot_id"])
+
   # TODO: is ValueError the right exception here?
   if len(key_objects) < 1:
-    raise ValueError("cannot find key with keyid '{}' on hsm '{}'".format(
-        hsm_key_id, hsm_info["slot_id"]))
+    raise ValueError("cannot find key {}".format(_for_key_on_hsm))
 
   if len(key_objects) > 1:
-    raise ValueError("found multiple keys with keyid '{}' on hsm '{}'".format(
-        hsm_key_id, hsm_info["slot_id"]))
+    raise ValueError("found multiple keys {}".format(_for_key_on_hsm))
 
   key_object = key_objects.pop()
-
-  key_type = session.getAttributeValue(key_object, [PyKCS11.CKA_KEY_TYPE])[0] # TODO: err
-
+  hsm_key_type = session.getAttributeValue(key_object, [PyKCS11.CKA_KEY_TYPE])[0] # TODO: err
 
 
-  if key_type == PyKCS11.CKK_EC:
-    params, point  = session.getAttributeValue(key_object, [
-        PyKCS11.CKA_EC_PARAMS,
-        PyKCS11.CKA_EC_POINT
-      ]) # TODO: err
+  if hsm_key_type != scheme_info["key_type"]:
+    raise ValueError("passed scheme '{}' requires a key of type '{}', "
+        "found key of type '{}' {}".format(
+        scheme,
+        PyKCS11.CKK[scheme_info["key_type"]],
+        PyKCS11.CKK.get(hsm_key_type, None),
+        _for_key_on_hsm))
 
+  params, point = session.getAttributeValue(key_object, [
+      PyKCS11.CKA_EC_PARAMS,
+      PyKCS11.CKA_EC_POINT
+    ])
 
-    # FIXME: don't hardcode
-    keytype = scheme
+  keytype = scheme
+  ec_param_obj = asn1crypto.keys.ECDomainParameters.load(bytes(params))
+  if ec_param_obj.chosen.native != scheme_info["curve"].name:
+    raise ValueError("passed scheme '{}' requires curve '{}', found curve "
+        "'{}' {}".format(
+        scheme,
+        scheme_info["curve"].name,
+        ec_param_obj.chosen.native,
+        _for_key_on_hsm))
 
-    ec_param_obj = asn1crypto.keys.ECDomainParameters.load(bytes(params))
-    oid = ec_param_obj.chosen.dotted
-    print("OID", oid)
-    # TODO: assert oid == MECHANISMS[scheme]["oid"]
-    ec_point_obj = asn1crypto.keys.ECPoint().load(bytes(point))
+  ec_point_obj = asn1crypto.keys.ECPoint().load(bytes(point))
+  crypto_public_key = EllipticCurvePublicKey.from_encoded_point(
+      scheme_info["curve"](), ec_point_obj.native)
+  public_key_value = crypto_public_key.public_bytes(
+      serialization.Encoding.PEM,
+      serialization.PublicFormat.SubjectPublicKeyInfo).decode()
 
-    #TODO: make curve variable
-    curve = SECP256R1
-    crypto_public_key = EllipticCurvePublicKey.from_encoded_point(
-        curve(), ec_point_obj.native)
-
-    public_key_value = crypto_public_key.public_bytes(
-        serialization.Encoding.PEM,
-        serialization.PublicFormat.SubjectPublicKeyInfo).decode()
-
-    # public_key_value = {
-    #     "q": binascii.hexlify(ec_point_obj.native).decode("ascii"),
-    #   }
-
-
-  else:
-    raise ValueError("key type '{}' not supported".format(key_type))
-
-  #TODO: method?
+  # NOTE: securesysmslib.formats.ECDSAKEY_SCHEMA uses the same string for
+  # "keytype" and "scheme".
   return {
       "keyid": sslib_key_id,
-      "keytype": keytype,
+      "keytype": scheme,
       "scheme": scheme,
       "keyval": {
         "public": public_key_value
@@ -393,10 +393,9 @@ def create_signature(hsm_info, hsm_key_id, user_pin, data, scheme, sslib_key_id)
   # values r and s, both represented as an octet string of equal length of at
   # most nLen with the most significant byte first (i.e. big endian)
   # https://docs.oasis-open.org/pkcs11/pkcs11-curr/v3.0/cs01/pkcs11-curr-v3.0-cs01.html#_Toc30061178
-  r_bytes = signature[:int(len(signature) / 2)]
-  s_bytes = signature[int(len(signature) / 2):]
-  r = int.from_bytes(r_bytes, byteorder="big")
-  s = int.from_bytes(s_bytes, byteorder="big")
+  r_s_len = int(len(signature) / 2)
+  r = int.from_bytes(signature[:r_s_len], byteorder="big")
+  s = int.from_bytes(signature[r_s_len:], byteorder="big")
 
   # Create an ASN.1 encoded Dss-Sig-Value to be used with pyca/cryptography
   dss_sig_value = binascii.hexlify(encode_dss_signature(r, s)).decode("ascii")
@@ -405,6 +404,7 @@ def create_signature(hsm_info, hsm_key_id, user_pin, data, scheme, sslib_key_id)
       "keyid": sslib_key_id,
       "sig": dss_sig_value
     }
+
 
 
 
