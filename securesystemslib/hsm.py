@@ -60,17 +60,10 @@ try:
 except ImportError:
   CRYPTO = False
 
-# Default salt size in bytes
-_SALT_SIZE = 16
 
 # Key types
-KEY_TYPE_RSA = "rsa"
-KEY_TYPE_DSA = "dsa"
 KEY_TYPE_ECC = "ecc"
 
-# Signing schemes
-RSASSA_PSS_SHA256 = "rsassa-pss-sha256"
-# RSASSA_PKCS15_SHA256 = "rsa-pkcs1v15-sha256"
 ECDSA_SIGN = "ecdsa-sha2-nistp256"
 
 # Module global to hold an instance of PyKCS11.PyKCS11Lib. If it remains 'None'
@@ -95,12 +88,6 @@ try:
   # TODO: Check mechanism names / what are mechanisms again?
   # TODO: Check mechanism flexibility
   MECHANISMS = {
-      RSASSA_PSS_SHA256: PyKCS11.RSA_PSS_Mechanism(
-          PyKCS11.CKM_SHA256_RSA_PKCS_PSS,
-          PyKCS11.CKM_SHA256,
-          PyKCS11.CKG_MGF1_SHA256,
-          _SALT_SIZE
-        ),
       ECDSA_SIGN: PyKCS11.Mechanism(PyKCS11.CKM_ECDSA_SHA256)
     }
 
@@ -341,7 +328,6 @@ def export_pubkey(hsm_info, hsm_key_id, scheme, sslib_key_id):
     crypto_public_key = EllipticCurvePublicKey.from_encoded_point(
         curve(), ec_point_obj.native)
 
-
     public_key_value = crypto_public_key.public_bytes(
         serialization.Encoding.PEM,
         serialization.PublicFormat.SubjectPublicKeyInfo).decode()
@@ -350,34 +336,6 @@ def export_pubkey(hsm_info, hsm_key_id, scheme, sslib_key_id):
     #     "q": binascii.hexlify(ec_point_obj.native).decode("ascii"),
     #   }
 
-  # elif key_type == PyKCS11.CKK_RSA:
-  #   modulus, exponent  = session.getAttributeValue(key_object, [
-  #       PyKCS11.CKA_MODULUS,
-  #       PyKCS11.CKA_PUBLIC_EXPONENT
-  #     ]) # TODO: err
-
-  #   # TODO: Use right scheme and create constants
-  #   key_type = KEY_TYPE_RSA
-
-  #   # TODO: convert public numbers ?
-  #   public_key_value = {
-  #       "e": binascii.hexlify(bytes(exponent)).decode("ascii"),
-  #       "n": binascii.hexlify(bytes(modulus)).decode("ascii")
-  #     }
-  # elif key_type == PyKCS11.CKK_DSA:
-    # prime, subprime, base, value, = session.getAttributeValue(key_object, [
-    #     PyKCS11.CKA_PRIME,
-    #     PyKCS11.CKA_SUBPRIME,
-    #     PyKCS11.CKA_BASE,
-    #     PyKCS11.CKA_VALUE
-    #   ]) # TODO: err
-    # key_type = "dsa"
-    # public_key_value = {
-    #   "p": prime,
-    #   "q": subprime,
-    #   "g": base,
-    #   "y": val
-    # }
 
   else:
     raise ValueError("key type '{}' not supported".format(key_type))
@@ -416,13 +374,11 @@ def create_signature(hsm_info, hsm_key_id, user_pin, data, scheme, sslib_key_id)
   # Create a session and login to generate signature using keys stored in hsm
   session = _setup_session(hsm_info, user_pin)
 
-
   #### DRY with export pubkey
   # TODO: KeyError check
   key_objects = session.findObjects([
       (PyKCS11.CKA_CLASS, PyKCS11.CKO_PRIVATE_KEY),
       (PyKCS11.CKA_ID,  hsm_key_id)])
-
 
   # TODO: is ValueError the right exception here?
   if len(key_objects) < 1:
@@ -446,13 +402,10 @@ def create_signature(hsm_info, hsm_key_id, user_pin, data, scheme, sslib_key_id)
   # values r and s, both represented as an octet string of equal length of at
   # most nLen with the most significant byte first (i.e. big endian)
   # https://docs.oasis-open.org/pkcs11/pkcs11-curr/v3.0/cs01/pkcs11-curr-v3.0-cs01.html#_Toc30061178
-
   r_bytes = signature[:int(len(signature) / 2)]
   s_bytes = signature[int(len(signature) / 2):]
-
   r = int.from_bytes(r_bytes, byteorder="big")
   s = int.from_bytes(s_bytes, byteorder="big")
-
 
   # Create an ASN.1 encoded Dss-Sig-Value to be used with pyca/cryptography
   dss_sig_value = binascii.hexlify(encode_dss_signature(r, s)).decode("ascii")
@@ -473,37 +426,6 @@ def create_signature(hsm_info, hsm_key_id, user_pin, data, scheme, sslib_key_id)
 
 #   # securesystemslib.formats.PUBLIC_KEY_SCHEMA.check_match(public_key)
 #   # securesystemslib.formats.SIGNATURE_SCHEMA.check_match(signature)
-
-#   if public_key["keytype"] == KEY_TYPE_RSA:
-#     crytpo_public_key = RSAPublicNumbers(
-#         int(public_key["keyval"]["public"]["e"], 16),
-#         int(public_key["keyval"]["public"]["n"], 16)).public_key(
-#         default_backend())
-
-#     digest_obj = securesystemslib.hash.digest_from_rsa_scheme(
-#       public_key["scheme"],  "pyca_crypto")
-
-#     crytpo_public_key.verify(
-#         binascii.unhexlify(signature["sig"]), data,
-#             padding.PSS(
-#                 mgf=padding.MGF1(digest_obj.algorithm),
-#                 salt_length=_SALT_SIZE),
-#                 digest_obj.algorithm)
-
-
-
-#   # elif key_type == KEY_TYPE_DSA:
-#   elif public_key["keytype"] == KEY_TYPE_ECC:
-
-#     # In verify
-#     #TODO: make curve variable
-#     curve = SECP256R1
-#     crypto_public_key = EllipticCurvePublicKey.from_encoded_point(
-#         curve(), binascii.unhexlify(public_key["keyval"]["public"]["q"]))
-
-#     # TODO: make hash algorithm variable
-#     crypto_public_key.verify(
-#       signature["sig"], data, ECDSA(hashes.SHA256()))
 
 
 #   else:
