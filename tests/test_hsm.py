@@ -10,7 +10,9 @@
   Test cases for hsm.py module
 
 
-  Requires PKCS11LIB envvar "/usr/local/lib/softhsm/libsofthsm2.so"
+  Requires PYKCS11LIB  
+
+  "/usr/local/lib/softhsm/libsofthsm2.so"
 
 """
 import unittest
@@ -33,10 +35,9 @@ import securesystemslib.hsm
 logger = logging.getLogger(__name__)
 
 
+# Skip if not crypto or not pykcs11 or not Python 3
 
-#  TODO: switch to envvar?
-PKCS11LIB = "/usr/local/lib/softhsm/libsofthsm2.so"
-
+os.environ["PYKCS11LIB"] = "/usr/local/lib/softhsm/libsofthsm2.so"
 
 class SoftHSMTestCase(unittest.TestCase):
   """
@@ -72,9 +73,8 @@ class SoftHSMTestCase(unittest.TestCase):
 
     os.environ["SOFTHSM2_CONF"] = os.path.join(cls.test_dir, "softhsm2.conf")
 
-
-    # Initializing the HSM
-    securesystemslib.hsm.load_pkcs11_lib(PKCS11LIB)
+    # Initializing the HSM (load library via envvar)
+    securesystemslib.hsm.load_pkcs11_lib()
     available_hsm = securesystemslib.hsm.get_hsms().pop()
     securesystemslib.hsm.PKCS11.initToken(
         available_hsm["slot_id"], cls.so_pin, cls.hsm_label)
@@ -87,13 +87,11 @@ class SoftHSMTestCase(unittest.TestCase):
     securesystemslib.hsm._teardown_session(session)
 
 
-
   @classmethod
   def tearDownClass(cls):
     os.chdir(cls.original_cwd)
     shutil.rmtree(cls.test_dir)
     del os.environ["SOFTHSM2_CONF"]
-
 
 
 
@@ -107,15 +105,15 @@ class TestECDSA(SoftHSMTestCase):
     # Patch mechanism securesystemslib signing schemes
     securesystemslib.hsm.SIGNING_SCHEMES[securesystemslib.hsm.ECDSA_SHA2_NISTP256]["mechanism"] = \
         PyKCS11.Mechanism(PyKCS11.CKM_ECDSA)
+    securesystemslib.hsm.SIGNING_SCHEMES[securesystemslib.hsm.ECDSA_SHA2_NISTP384]["mechanism"] = \
+        PyKCS11.Mechanism(PyKCS11.CKM_ECDSA)
 
-
-    curves = [
-      ((0x00, ), "secp256r1"),
-      # ((0x01, ), "secp384r1")
+    cls.key_infos = [
+      ((0x00, ), "secp256r1", securesystemslib.hsm.ECDSA_SHA2_NISTP256),
+      ((0x01, ), "secp384r1", securesystemslib.hsm.ECDSA_SHA2_NISTP384)
     ]
 
-    cls.keys = {}
-    for hsm_key_id, curve in curves:
+    for hsm_key_id, curve, _ in cls.key_infos:
       domain_params = ECDomainParameters(name="named", value=NamedCurve(curve))
       ec_params = domain_params.dump()
 
@@ -147,14 +145,6 @@ class TestECDSA(SoftHSMTestCase):
           ec_public_template, ec_private_template,
           mecha=PyKCS11.MechanismECGENERATEKEYPAIR)
 
-      cls.keys = {
-        curve: {
-          "hsm_key_id": hsm_key_id,
-          "public": public_key,
-          "private": private_key
-        }
-      }
-
     securesystemslib.hsm._teardown_session(session)
 
   @classmethod
@@ -164,31 +154,31 @@ class TestECDSA(SoftHSMTestCase):
     # Restore mechanism for TestECDSAOnYubiKey to work
     securesystemslib.hsm.SIGNING_SCHEMES[securesystemslib.hsm.ECDSA_SHA2_NISTP256]["mechanism"] = \
         PyKCS11.Mechanism(PyKCS11.CKM_ECDSA_SHA256)
+    securesystemslib.hsm.SIGNING_SCHEMES[securesystemslib.hsm.ECDSA_SHA2_NISTP384]["mechanism"] = \
+        PyKCS11.Mechanism(PyKCS11.CKM_ECDSA_SHA384)
 
   def test_keys(self):
-    scheme = "ecdsa-sha2-nistp256"
-    hsm_key_id = (0x00, )
     sslib_key_id = "123456"
     data = b"Hello world"
 
-    public_key = securesystemslib.hsm.export_pubkey(
-        self.hsm_info, hsm_key_id, scheme, sslib_key_id)
-    print(public_key)
+    for hsm_key_id, _, scheme in self.key_infos:
+      public_key = securesystemslib.hsm.export_pubkey(
+          self.hsm_info, hsm_key_id, scheme, sslib_key_id)
+      print(public_key)
 
+      # Create a signature
+      # We have to prehash the data for SoftHSM, which only supports CKM_ECDSA
+      # mechanism
+      hasher = securesystemslib.hash.digest(algorithm="sha256")
+      hasher.update(data)
+      pre_hashed_data = hasher.digest()
 
-    # Create a signature
-    # We have to prehash the data for SoftHSM, which only supports CKM_ECDSA
-    # mechanism
-    hasher = securesystemslib.hash.digest(algorithm="sha256")
-    hasher.update(data)
-    pre_hashed_data = hasher.digest()
+      signature = securesystemslib.hsm.create_signature(
+          self.hsm_info, hsm_key_id, self.user_pin, pre_hashed_data, scheme, sslib_key_id)
 
-    signature = securesystemslib.hsm.create_signature(
-        self.hsm_info, hsm_key_id, self.user_pin, pre_hashed_data, scheme, sslib_key_id)
-
-    # Verify signature
-    result = securesystemslib.keys.verify_signature(public_key, signature, data)
-    self.assertTrue(result)
+      # Verify signature
+      result = securesystemslib.keys.verify_signature(public_key, signature, data)
+      self.assertTrue(result)
 
 
 
