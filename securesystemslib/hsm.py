@@ -407,24 +407,6 @@ def create_signature(hsm_info, hsm_key_id, user_pin, data, scheme, sslib_key_id)
     }
 
 
-# def verify_signature(public_key, signature, data):
-#   """
-#   TODO
-
-#   """
-#   if not CRYPTO:
-#     raise UnsupportedLibraryError(NO_CRYPTO_MSG)
-
-#   # securesystemslib.formats.PUBLIC_KEY_SCHEMA.check_match(public_key)
-#   # securesystemslib.formats.SIGNATURE_SCHEMA.check_match(signature)
-
-
-#   else:
-#     raise ValueError("key type '{}' not supported".format(
-#         public_key["key_type"]))
-
-
-
 
 def _setup_session(hsm_info, user_pin=None, user_type=PyKCS11.CKU_USER):
   """Create new hsm session, login if pin is passed and return session object.
