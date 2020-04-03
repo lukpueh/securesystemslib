@@ -104,8 +104,9 @@ setup(
   extras_require = {
       'colors': ['colorama>=0.3.9'],
       'crypto': ['cryptography>=2.6'],
+      'pkcs11': ['PyKCS11>=1.5.7; python_version > "3"'],
       'pynacl': ['pynacl>1.2.0']},
-  tests_require = ['mock; python_version < "3.3"', 'PyKCS11>=1.5.5; python_version > "3"'],
+  tests_require = ['mock; python_version < "3.3"'],
   packages = find_packages(exclude=['tests', 'debian']),
   scripts = []
 )
