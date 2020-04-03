@@ -40,9 +40,12 @@ TODO: a bit more testing
 
 
 """
+import six
 import logging
 import binascii
-import asn1crypto.keys
+
+if not six.PY2:
+  import asn1crypto.keys
 
 import securesystemslib.formats
 import securesystemslib.hash
@@ -440,9 +443,14 @@ def create_signature(hsm_info, hsm_key_id, user_pin, data, scheme,
 
 
 
-def _setup_session(hsm_info, user_pin=None, user_type=PyKCS11.CKU_USER):
+def _setup_session(hsm_info, user_pin=None, user_type=None):
   """Create new hsm session, login if pin is passed and return session object.
   """
+  # Don't add PyKCS11.CKU_USER to function signature to make this module
+  # importable even if PyKCS11 is not installed
+  if user_type is None:
+    user_type = PyKCS11.CKU_USER
+
   try:
     # TODO: parametrize RW (probably only needed for tests)
     session = PKCS11.openSession(

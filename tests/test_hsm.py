@@ -221,6 +221,7 @@ def _pre_hash(data, scheme):
 
 
 # TODO: Remove here, add as example usage in README.md
+@unittest.skipIf(six.PY2, "HSM interface not supported on Python 2")
 @unittest.skipUnless(os.environ.get("LUKPUEH_YUBI_PIN", None),
     "tmp local testing")
 class TestECDSAOnLUKPUEHsYubiKey(unittest.TestCase):
