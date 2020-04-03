@@ -120,7 +120,3 @@ class URLMatchesNoPatternError(Error):
 class InvalidConfigurationError(Error):
   """If a configuration object does not match the expected format."""
   pass
-
-class PKCS11DynamicLibraryLoadingError(Error):
-  """Could not load the PKCS#11 dynamic library. """
-  pass

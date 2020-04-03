@@ -17,28 +17,36 @@
   This module uses PyKCS11, a python wrapper (SWIG) for PKCS#11 modules
   to communicate with the cryptographic tokens
 
-TODO: Docstrings
-TODO: Error handling
-  - PyKCS11 openSession on a slot  requires prior call to get slots
-    (can't just pass integer id)
-  - handle hsm return invalid/incomplete data (e.g. getAttributeValue)
 
-TODO: Exception taxonomy
+TODO: error handling
+  - PKCS11 seems brittle: Make sure that there are no state problems (e.g.
+    openSession on a slot requires prior call to get slots, etc.) and we always
+    get back the values we expect, i.e. handle hsm return invalid/incomplete
+    data (e.g. getAttributeValue), and fail gracefully if not
+    hint: take a look at check all CKR_<RETURN VALUE TYPE> constants
+  - revise error messages and exception taxonomy
+  - Add HSM_INFO_SCHEMA and HSM_INFO_SCHEMA, HSM_KEY_INFO_SCHEMA,
+    HSM_KEY_ID_SCHEMA and check_match on them.
 
-TODO: Note about DRY with securesystemslib.keys and securesystemslib.gpg.{rsa,dsa,eddsa}
+TODO: docs
+  - flesh out function docstrings and code comments
+  - add links to PKCS11 specs
+  - add usage docs, e.g. replace test_hsm.TestECDSAOnLUKPUEHsYubiKey with some
+    instructions for YubiKey in README.md
 
-TODO: keyid and mechanisms: just pass to export_pubkey and create_signature? :)
+TODO: a bit more testing
+  - check coverage, trigger edge cases (errors)
+  - add interface tests, i.e. if optional libraries are not installed
+
 
 """
-
 import logging
 import binascii
 import asn1crypto.keys
 
 import securesystemslib.formats
 import securesystemslib.hash
-from securesystemslib.exceptions import (
-    UnsupportedLibraryError, PKCS11DynamicLibraryLoadingError)
+from securesystemslib.exceptions import UnsupportedLibraryError
 
 logger = logging.getLogger(__name__)
 
@@ -59,15 +67,7 @@ NO_PKCS11_DYN_LIB_MSG = "HSM support requires PKCS11 shared object"
 
 try:
   from cryptography.hazmat.backends import default_backend
-  from cryptography.hazmat.primitives import serialization
-  from cryptography.hazmat.primitives import hashes
-  from cryptography.hazmat.primitives.asymmetric import padding
-  from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicNumbers
-  from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
-  from cryptography.hazmat.primitives.asymmetric.ec import (
-      EllipticCurvePublicKey, SECP256R1, SECP384R1, ECDSA)
-
-  from cryptography import x509
+  from cryptography.hazmat.primitives import serialization, asymmetric
 
 except ImportError:
   CRYPTO = False
@@ -81,7 +81,6 @@ except ImportError as e:
   # Missing PyKCS11 python library. PKCS11 must remain 'None'.
   logger.debug(e)
 
-# TODO: Create securesystemslib-wide constants and use them everywhere
 ECDSA_SHA2_NISTP256 = "ecdsa-sha2-nistp256"
 ECDSA_SHA2_NISTP384 = "ecdsa-sha2-nistp384"
 
@@ -89,11 +88,11 @@ if PKCS11 is not None and CRYPTO:
   SIGNING_SCHEMES = {
     ECDSA_SHA2_NISTP256: {
       "mechanism": PyKCS11.Mechanism(PyKCS11.CKM_ECDSA_SHA256),
-      "curve": SECP256R1
+      "curve": asymmetric.ec.SECP256R1
       },
     ECDSA_SHA2_NISTP384: {
       "mechanism": PyKCS11.Mechanism(PyKCS11.CKM_ECDSA_SHA384),
-      "curve": SECP384R1
+      "curve": asymmetric.ec.SECP384R1
       }
     }
 
@@ -105,19 +104,17 @@ def load_pkcs11_lib(path=None):
   <Purpose>
     Load PKCS#11 dynamic library on 'PKCS11' instance (module global).
 
-    NOTE: Wraps _load_pkcs11_lib, which needs to be defined above in the import
-    block because we also use there.
-
   <Arguments>
     path: (optional)
             Path to the PKCS#11 dynamic library shared object. If not passed
             the PyKCS11 will read the 'PYKCS11LIB' environment variable.
 
   <Exceptions>
-    UnsupportedLibraryError
-            I PyKCS11 is not available
-    PKCS11DynamicLibraryLoadingError
-            If the PKCS#11 dynamic library can not be loaded.
+    UnsupportedLibraryError if the PyKCS11 library is not available.
+
+    PyKCS11.PyKCS11Error if the PKCS11 dynamic library cannot be loaded.
+
+     FormatError if the argument is malformed.
 
   <Side Effects>
     Loads the PKCS#11 shared object on the PKCS11 module global.
@@ -143,19 +140,21 @@ def load_pkcs11_lib(path=None):
 
   except PyKCS11.PyKCS11Error as e:
     PKCS11_DYN_LIB = False
-    # TODO: Add message "Could not load + e + NO_PKCS11_DYN_LIB_MSG
-    raise PKCS11DynamicLibraryLoadingError(e)
+    raise
 
 
 
 def get_hsms():
   """
   <Purpose>
-    Iterate over hsm slots and return list with info for each HSM.
+    Iterate over HSM slots and return list with info for each HSM.
+
+  <Exceptions>
+    UnsupportedLibraryError if the PyKCS11 library is not available or the
+    PKCS#11 shared object could not be loaded.
 
   <Return>
-    List of dictionaries conforming to HSM_INFO_SCHEMA.
-    TODO: SCHEMA
+    List of HSM info dictionaries conforming to HSM_INFO_SCHEMA.
 
   """
   if PKCS11 is None:
@@ -183,18 +182,21 @@ def get_hsms():
 def get_keys_on_hsm(hsm_info, user_pin=None):
   """
   <Purpose>
-    Get handles of public and private keys stored on the HSM.
-    To get private key handles login is required before using this method.
+    Get handles of public and private keys stored on the HSM. To get private
+    key handles this function requires a user_pin.
 
   <Argument>
     hsm_info:
-            A dictionary conforming to HSM_INFO_SCHEMA;
+            A dictionary to identify the HSM conforming to HSM_INFO_SCHEMA.
 
     user_pin:
-            A string to log into the HSM. Required to get private keys.
+            A string to log into the HSM. Only required for private key infos.
 
   <Exceptions>
-    TODO
+    UnsupportedLibraryError if the PyKCS11 library is not available or the
+    PKCS#11 shared object could not be loaded.
+
+    FormatError if arguments are malformed.
 
   <Returns>
     List of dictionaries conforming to HSM_KEY_INFO_SCHEMA.
@@ -206,7 +208,7 @@ def get_keys_on_hsm(hsm_info, user_pin=None):
   if not PKCS11_DYN_LIB:
     raise UnsupportedLibraryError(NO_PKCS11_DYN_LIB_MSG)
 
-  # TODO: HSM_INFO_SCHEMA.check_match(hsm_info)
+  # TODO: securesystemslib.formats.HSM_INFO_SCHEMA.check_match(hsm_info)
 
   if user_pin:
     securesystemslib.formats.PASSWORD_SCHEMA.check_match(user_pin)
@@ -220,9 +222,7 @@ def get_keys_on_hsm(hsm_info, user_pin=None):
       [(PyKCS11.CKA_CLASS, PyKCS11.CKO_PRIVATE_KEY)]) + session.findObjects(
       [(PyKCS11.CKA_CLASS, PyKCS11.CKO_PUBLIC_KEY)]):
 
-    # TODO: Assert len(return val of getAttributeValue) == 1 of ?
-    # TODO: Add more human readable info? key type (CKA_KEY_TYPE),
-    # only show one per id (public and private)?
+    # TODO: Add more human readable info
     hsm_key_info_list.append({
         "key_id": session.getAttributeValue(obj, [PyKCS11.CKA_ID])[0],
         "label": session.getAttributeValue(obj, [PyKCS11.CKA_LABEL])[0]
@@ -239,31 +239,36 @@ def export_pubkey(hsm_info, hsm_key_id, scheme, sslib_key_id):
   """
   <Purpose>
     Export a public key identified by the passed hsm_info and key_info
-    into asecuresystemslib-like format.
-
-    NOTE: The HSM library currently does not generate keyids on pubkey export
-    or signature creation, as other securesystemslib modules would do, as
-    keyid flexibility is under discussion. Instead callers can assign any
-    keyid they want.
-
-    Cryptoki data types
-
-    http://docs.oasis-open.org/pkcs11/pkcs11-base/v3.0/pkcs11-base-v3.0.html
-    https://docs.oasis-open.org/pkcs11/pkcs11-curr/v3.0/cs01/pkcs11-curr-v3.0-cs01.html
-
-    Big integer
-      a string of CK_BYTE (unsigned chas) representing an unsigned
-      integer of arbitrary size, most-significant byte first (e.g., the integer
-      32768 is represented as the 2-byte string 0x80 0x00)
-
+    into a securesystemslib-like format.
 
   <Arguments>
+    hsm_info:
+            A dictionary to identify the HSM conforming to HSM_INFO_SCHEMA.
+
+    hsm_key_id:
+            A tuple to identify a public key on the HSM conforming to
+            HSM_KEY_ID_SCHEMA.
+
+    scheme:
+          A signing scheme conforming to ECDSA_SCHEME_SCHEMA.
+
+    sslib_key_id:
+            The keyid to be assigned to the returned public key dictionary
+            'keyid' field.
+
+            NOTE: The HSM library currently does not generate keyids on public
+            key export or signature creation, as other securesystemslib modules
+            would do, as keyid flexibility is under discussion. Instead callers
+            can assign any keyid they want.
 
   <Exceptions>
-    TODO
+    UnsupportedLibraryError if the PyKCS11 or cryptography libraries are not
+    available or the PKCS#11 shared object could not be loaded.
+
+    FormatError if arguments are malformed.
 
   <Returns>
-    A public key dictionary that conforms to 'PUBLIC_KEY_SCHEMA'.
+    An ECDSA public key dictionary conforming to PUBLIC_KEY_SCHEMA.
 
   """
   if not CRYPTO:
@@ -275,21 +280,15 @@ def export_pubkey(hsm_info, hsm_key_id, scheme, sslib_key_id):
   if not PKCS11_DYN_LIB:
     raise UnsupportedLibraryError(NO_PKCS11_DYN_LIB_MSG)
 
-  if scheme not in SIGNING_SCHEMES.keys():
-    raise ValueError("passed scheme {} not supported. choose one of {}".format(
-        scheme, ",".join(SIGNING_SCHEMES.keys())))
+  #TODO: securesystemslib.formats.HSM_INFO_SCHEMA.check_match(hsm_info)
+  #TODO: securesystemslib.formats.HSM_KEY_ID_SCHEMA.check_match(hsm_key_id)
+  securesystemslib.formats.ECDSA_SCHEME_SCHEMA.check_match(scheme)
+  securesystemslib.formats.KEYID_SCHEMA.check_match(sslib_key_id)
 
   scheme_info = SIGNING_SCHEMES[scheme]
 
-  # TODO: HSM_INFO_SCHEMA.check_match(hsm_info)
-  # TODO: HSM_KEY_INFO_SCHEMA.check_match(key_info)
-  # TODO: keyid check
-  # scheme check
-
-  # Create HSM session, without logging in, which is not required for pubkeys
   session = _setup_session(hsm_info)
 
-  # TODO: KeyError check
   key_objects = session.findObjects([
       (PyKCS11.CKA_CLASS, PyKCS11.CKO_PUBLIC_KEY),
       (PyKCS11.CKA_ID, hsm_key_id)])
@@ -305,8 +304,8 @@ def export_pubkey(hsm_info, hsm_key_id, scheme, sslib_key_id):
     raise ValueError("found multiple keys {}".format(_for_key_on_hsm))
 
   key_object = key_objects.pop()
-  hsm_key_type = session.getAttributeValue(key_object, [PyKCS11.CKA_KEY_TYPE])[0] # TODO: err
-
+  hsm_key_type = session.getAttributeValue(
+      key_object, [PyKCS11.CKA_KEY_TYPE])[0]
 
   if hsm_key_type != PyKCS11.CKK_EC:
     raise ValueError("passed scheme '{}' requires a key of type '{}', "
@@ -332,7 +331,7 @@ def export_pubkey(hsm_info, hsm_key_id, scheme, sslib_key_id):
         _for_key_on_hsm))
 
   ec_point_obj = asn1crypto.keys.ECPoint().load(bytes(point))
-  crypto_public_key = EllipticCurvePublicKey.from_encoded_point(
+  crypto_public_key = asymmetric.ec.EllipticCurvePublicKey.from_encoded_point(
       scheme_info["curve"](), ec_point_obj.native)
   public_key_value = crypto_public_key.public_bytes(
       serialization.Encoding.PEM,
@@ -351,9 +350,41 @@ def export_pubkey(hsm_info, hsm_key_id, scheme, sslib_key_id):
 
 
 
-def create_signature(hsm_info, hsm_key_id, user_pin, data, scheme, sslib_key_id):
+def create_signature(hsm_info, hsm_key_id, user_pin, data, scheme,
+    sslib_key_id):
   """
-  TODO
+  <Purpose>
+    Sign passed data on HSM.
+
+  <Arguments>
+    hsm_info:
+            A dictionary to identify the HSM conforming to HSM_INFO_SCHEMA.
+
+    hsm_key_id:
+            A tuple to identify a private key on the HSM conforming to
+            HSM_KEY_ID_SCHEMA.
+
+    user_pin:
+            A string to log into the HSM.
+
+    data:
+        The bytes to sign.
+
+    scheme:
+          A signing scheme conforming to ECDSA_SCHEME_SCHEMA.
+
+    sslib_key_id:
+            The keyid to be assigned to the returned public key dictionary
+            'keyid' field.
+
+  <Exceptions>
+    UnsupportedLibraryError if the PyKCS11 or cryptography libraries are not
+    available or the PKCS#11 shared object could not be loaded.
+
+    FormatError if arguments are malformed.
+
+  <Returns>
+    A signature dictionary conforming to SIGNATURE_SCHEMA.
 
   """
   if not CRYPTO:
@@ -365,17 +396,18 @@ def create_signature(hsm_info, hsm_key_id, user_pin, data, scheme, sslib_key_id)
   if not PKCS11_DYN_LIB:
     raise UnsupportedLibraryError(NO_PKCS11_DYN_LIB_MSG)
 
-  # TODO: HSM_INFO.check_match(private_key_info)
-  # TODO: PRIVATE_KEY_INFO.check_match(private_key_info)
-  # TODO: Check supported scheme
+  #TODO: securesystemslib.formats.HSM_INFO_SCHEMA.check_match(hsm_info)
+  #TODO: securesystemslib.formats.HSM_KEY_ID_SCHEMA.check_match(hsm_key_id)
   securesystemslib.formats.PASSWORD_SCHEMA.check_match(user_pin)
+  securesystemslib.formats.DATA_SCHEMA.check_match(data)
+  securesystemslib.formats.ECDSA_SCHEME_SCHEMA.check_match(scheme)
+  securesystemslib.formats.KEYID_SCHEMA.check_match(sslib_key_id)
 
   # Create a session and login to generate signature using keys stored in hsm
   session = _setup_session(hsm_info, user_pin)
 
+  # TODO: DRY with export_pubkey and add proper error handling
 
-  #### DRY with export pubkey
-  # TODO: KeyError check
   key_objects = session.findObjects([
       (PyKCS11.CKA_CLASS, PyKCS11.CKO_PRIVATE_KEY),
       (PyKCS11.CKA_ID,  hsm_key_id)])
@@ -383,15 +415,10 @@ def create_signature(hsm_info, hsm_key_id, user_pin, data, scheme, sslib_key_id)
   key_object = key_objects.pop()
   key_type = session.getAttributeValue(key_object, [PyKCS11.CKA_KEY_TYPE])[0]
 
-  # Including checks from above
-
-  #### DRY END
-
-
-
-
   # https://docs.oasis-open.org/pkcs11/pkcs11-curr/v3.0/cs01/pkcs11-curr-v3.0-cs01.html#_Toc30061178
-  signature = session.sign(key_object, data, SIGNING_SCHEMES[scheme]["mechanism"]) # TODO err
+  signature = session.sign(
+      key_object, data, SIGNING_SCHEMES[scheme]["mechanism"])
+
   _teardown_session(session)
 
   # The PKCS11 signature octets correspond to the concatenation of the ECDSA
@@ -403,7 +430,8 @@ def create_signature(hsm_info, hsm_key_id, user_pin, data, scheme, sslib_key_id)
   s = int.from_bytes(signature[r_s_len:], byteorder="big")
 
   # Create an ASN.1 encoded Dss-Sig-Value to be used with pyca/cryptography
-  dss_sig_value = binascii.hexlify(encode_dss_signature(r, s)).decode("ascii")
+  dss_sig_value = binascii.hexlify(
+      asymmetric.utils.encode_dss_signature(r, s)).decode("ascii")
 
   return {
       "keyid": sslib_key_id,
@@ -412,15 +440,14 @@ def create_signature(hsm_info, hsm_key_id, user_pin, data, scheme, sslib_key_id)
 
 
 
-
 def _setup_session(hsm_info, user_pin=None, user_type=PyKCS11.CKU_USER):
   """Create new hsm session, login if pin is passed and return session object.
   """
   try:
+    # TODO: parametrize RW (probably only needed for tests)
     session = PKCS11.openSession(
         hsm_info["slot_id"],
-        PyKCS11.CKF_SERIAL_SESSION | PyKCS11.CKF_RW_SESSION) # TODO: parametrize RW (only needed for tests)
-
+        PyKCS11.CKF_SERIAL_SESSION | PyKCS11.CKF_RW_SESSION)
     if user_pin is not None:
       session.login(user_pin, user_type)
 
@@ -428,7 +455,6 @@ def _setup_session(hsm_info, user_pin=None, user_type=PyKCS11.CKU_USER):
     if PyKCS11.CKR[e.value] == "CKR_USER_ALREADY_LOGGED_IN":
       logger.debug(
           "CKU_USER already logged into HSM '{}'".format(hsm_info["slot_id"]))
-    # TODO: elif?
 
     else:
       raise
