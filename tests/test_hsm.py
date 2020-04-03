@@ -3,8 +3,12 @@
 <Program Name>
   test_hsm.py
 
+<Started>
+  June 19, 2019.
+
 <Author>
-  Tansihq Jasoria
+  Tanishq Jasoria <jasoriatanishq@gmail.com>
+  Lukas Puehringer <lukas.puehringer@nyu.edu>
 
 <Purpose>
   Test cases for hsm.py module.
@@ -133,7 +137,6 @@ class TestECDSA(SoftHSMTestCase):
         mecha=PyKCS11.MechanismECGENERATEKEYPAIR)
 
 
-
   @classmethod
   def setUpClass(cls):
     super(TestECDSA, cls).setUpClass()
@@ -155,15 +158,15 @@ class TestECDSA(SoftHSMTestCase):
 
       # Back up and monkey-patch signing mechanism for testing with SoftHSM
       # NOTE: SoftHSM only support the unhashed CKM_ECDSA mechanism, to still
-      # be able to test 'securesystemslib.hsm' we monkey-patch its supported
-      # mechanisms and pre-hash the data in the tests below.
+      # be able to test 'securesystemslib.hsm', which uses CKM_ECDSA_SHA<XYZ>,
+      # we monkey-patch its supported mechanisms and pre-hash the data in the
+      # tests below.
       cls.original_mechanisms[scheme] = \
           securesystemslib.hsm.SIGNING_SCHEMES[scheme]["mechanism"]
       securesystemslib.hsm.SIGNING_SCHEMES[scheme]["mechanism"] = \
           PyKCS11.Mechanism(PyKCS11.CKM_ECDSA)
 
     securesystemslib.hsm._teardown_session(session)
-
 
 
   @classmethod
@@ -175,32 +178,51 @@ class TestECDSA(SoftHSMTestCase):
       securesystemslib.hsm.SIGNING_SCHEMES[scheme]["mechanism"] = mechanism
 
 
-
   def test_keys(self):
-    sslib_key_id = "123456"
-    data = b"Hello world"
+    """Test export pubkey, sign on HSM and verify w/o HSM. """
 
+    sslib_key_id = \
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    data = b"deadbeef"
+
+    # Test export key, sign and verify signature on available schemes
     for hsm_key_id, scheme in self.hsm_keyid_scheme_tuples:
       public_key = securesystemslib.hsm.export_pubkey(
           self.hsm_info, hsm_key_id, scheme, sslib_key_id)
-      # Create a signature
-      # We have to prehash the data for SoftHSM, which only supports CKM_ECDSA
-      # mechanism
-      hasher = securesystemslib.hash.digest(algorithm="sha256")
-      hasher.update(data)
-      pre_hashed_data = hasher.digest()
+
+      self.assertTrue(
+          securesystemslib.formats.ECDSAKEY_SCHEMA.matches(public_key),
+          "public key must match ECDSAKEY_SCHEMA, got {}".format(public_key))
 
       signature = securesystemslib.hsm.create_signature(
-          self.hsm_info, hsm_key_id, self.user_pin, pre_hashed_data, scheme, sslib_key_id)
+          self.hsm_info, hsm_key_id, self.user_pin, _pre_hash(data, scheme),
+          scheme, sslib_key_id)
 
-      # Verify signature
-      result = securesystemslib.keys.verify_signature(public_key, signature, data)
-      self.assertTrue(result)
+      self.assertTrue(
+          securesystemslib.formats.SIGNATURE_SCHEMA.matches(signature),
+          "signature must match SIGNATURE_SCHEMA, got {}".format(signature))
+
+      self.assertTrue(
+          securesystemslib.keys.verify_signature(public_key, signature, data),
+          "signature verification must pass")
+
+
+
+def _pre_hash(data, scheme):
+  """ A helper to work around SoftHSM's limited choice of mechanisms by
+  pre-hashing the data to be signed. The hash coincides with the last 3 chars
+  of the scheme string.
+
+  """
+  hasher = securesystemslib.hash.digest(algorithm="sha" + scheme[-3:])
+  hasher.update(data)
+  return hasher.digest()
 
 
 
 # TODO: Remove here, add as example usage in README.md
-@unittest.skipUnless(os.environ.get("LUKPUEH_YUBI_PIN", None), "tmp local testing")
+@unittest.skipUnless(os.environ.get("LUKPUEH_YUBI_PIN", None),
+    "tmp local testing")
 class TestECDSAOnLUKPUEHsYubiKey(unittest.TestCase):
   @classmethod
   def setUpClass(cls):
