@@ -147,6 +147,7 @@ def load_pkcs11_lib(path=None):
     raise PKCS11DynamicLibraryLoadingError(e)
 
 
+
 def get_hsms():
   """
   <Purpose>
@@ -223,8 +224,8 @@ def get_keys_on_hsm(hsm_info, user_pin=None):
     # TODO: Add more human readable info? key type (CKA_KEY_TYPE),
     # only show one per id (public and private)?
     hsm_key_info_list.append({
-      "key_id": session.getAttributeValue(obj, [PyKCS11.CKA_ID])[0],
-      "label": session.getAttributeValue(obj, [PyKCS11.CKA_LABEL])[0]
+        "key_id": session.getAttributeValue(obj, [PyKCS11.CKA_ID])[0],
+        "label": session.getAttributeValue(obj, [PyKCS11.CKA_LABEL])[0]
       })
 
   # Logout, if logged in, and close session
@@ -240,7 +241,10 @@ def export_pubkey(hsm_info, hsm_key_id, scheme, sslib_key_id):
     Export a public key identified by the passed hsm_info and key_info
     into asecuresystemslib-like format.
 
-
+    NOTE: The HSM library currently does not generate keyids on pubkey export
+    or signature creation, as other securesystemslib modules would do, as
+    keyid flexibility is under discussion. Instead callers can assign any
+    keyid they want.
 
     Cryptoki data types
 
@@ -440,7 +444,3 @@ def _teardown_session(session):
 
     except Exception as e:
       logger.debug(e)
-
-
-if __name__ == "__main__":
-  main()
