@@ -41,8 +41,6 @@ def setUpModule():
     raise unittest.SkipTest("HSM interface not supported on Python 2")
 
 
-# TODO: remove
-os.environ["PYKCS11LIB"] = "/usr/local/lib/softhsm/libsofthsm2.so"
 
 class SoftHSMTestCase(unittest.TestCase):
   """
@@ -75,8 +73,7 @@ class SoftHSMTestCase(unittest.TestCase):
 
     os.environ["SOFTHSM2_CONF"] = os.path.join(cls.test_dir, "softhsm2.conf")
 
-    # Initializing the HSM
-    # make sure to set PYKCS11LIB!!
+    # NOTE: Requires SoftHSM shared object path on the PYKCS11LIB env var
     securesystemslib.hsm.load_pkcs11_lib()
     available_hsm = securesystemslib.hsm.get_hsms().pop()
     securesystemslib.hsm.PKCS11.initToken(
