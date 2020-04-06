@@ -28,8 +28,11 @@ matrix:
         - sudo apt-get remove -y --allow-remove-essential gnupg gnupg2
 
 before_install:
-  - sudo apt-get update
-  - sudo apt-get install -y swig
+
+  - if [ $TOXENV == "py35" || $TOXENV == "py36" || $TOXENV == "py37" || $TOXENV == "py38" ]; then
+      sudo apt-get update && sudo apt-get install -y swig libsofthsm2-dev;
+    fi
+
 
 install:
   - pip install -U tox coveralls
