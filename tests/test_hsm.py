@@ -213,6 +213,32 @@ class TestECDSA(SoftHSMTestCase):
           "signature verification must pass")
 
 
+class TestInterfaceWithoutDynlib(unittest.TestCase):
+  def test_dynlib_error(self):
+    """Test the interface function raise proper error on missing dyn lib. """
+
+    # Temporarily pretend that the dynamic library was not loaded
+    # NOTE: Arg vetting comes after so we can pass anything
+    has_dyn_lib = securesystemslib.hsm.PKCS11_DYN_LIB
+    securesystemslib.hsm.PKCS11_DYN_LIB = False
+
+    for func, args in [
+          (securesystemslib.hsm.get_hsms, []),
+          (securesystemslib.hsm.get_keys_on_hsm, [None]),
+          (securesystemslib.hsm.export_pubkey, [None] * 4),
+          (securesystemslib.hsm.create_signature, [None] * 6)
+        ]:
+
+      with self.assertRaises(
+          securesystemslib.exceptions.UnsupportedLibraryError) as ctx:
+        func(*args)
+
+      self.assertEqual(
+          securesystemslib.hsm.NO_PKCS11_DYN_LIB_MSG, str(ctx.exception))
+
+    securesystemslib.hsm.PKCS11_DYN_LIB = has_dyn_lib
+
+
 
 def _pre_hash(data, scheme):
   """ A helper to work around SoftHSM's limited choice of mechanisms by
@@ -227,33 +253,34 @@ def _pre_hash(data, scheme):
 
 
 # TODO: Remove here, add as example usage in README.md
-@unittest.skipUnless(os.environ.get("LUKPUEH_YUBI_PIN", None),
-    "tmp local testing")
-class TestECDSAOnLUKPUEHsYubiKey(unittest.TestCase):
-  @classmethod
-  def setUpClass(cls):
-    cls.user_pin = os.environ["LUKPUEH_YUBI_PIN"]
+# @unittest.skipUnless(os.environ.get("LUKPUEH_YUBI_PIN", None),
+#     "tmp local testing")
+# class TestECDSAOnLUKPUEHsYubiKey(unittest.TestCase):
+#   @classmethod
+#   def setUpClass(cls):
+#     cls.user_pin = os.environ["LUKPUEH_YUBI_PIN"]
 
-    securesystemslib.hsm.load_pkcs11_lib(
-        "/usr/local/Cellar/yubico-piv-tool/2.0.0/lib/libykcs11.dylib")
-    cls.hsm_info = securesystemslib.hsm.get_hsms().pop()
-    cls.sslib_key_id = "123456"
-    cls.data = b"Hello world"
+#     securesystemslib.hsm.load_pkcs11_lib(
+#         "/usr/local/Cellar/yubico-piv-tool/2.0.0/lib/libykcs11.dylib")
 
-  def test_key(self):
-    scheme = ECDSA_SHA2_NISTP256
-    hsm_key_id = (0x02, )
+#     cls.hsm_info = securesystemslib.hsm.get_hsms().pop()
+#     cls.sslib_key_id = "123456"
+#     cls.data = b"Hello world"
 
-    public_key = securesystemslib.hsm.export_pubkey(
-        self.hsm_info, hsm_key_id, scheme, self.sslib_key_id)
+#   def test_key(self):
+#     scheme = ECDSA_SHA2_NISTP256
+#     hsm_key_id = (0x02, )
 
-    signature = securesystemslib.hsm.create_signature(
-        self.hsm_info, hsm_key_id, self.user_pin, self.data, scheme,
-        self.sslib_key_id)
+#     public_key = securesystemslib.hsm.export_pubkey(
+#         self.hsm_info, hsm_key_id, scheme, self.sslib_key_id)
 
-    result = securesystemslib.keys.verify_signature(
-        public_key, signature, self.data)
-    self.assertTrue(result)
+#     signature = securesystemslib.hsm.create_signature(
+#         self.hsm_info, hsm_key_id, self.user_pin, self.data, scheme,
+#         self.sslib_key_id)
+
+#     result = securesystemslib.keys.verify_signature(
+#         public_key, signature, self.data)
+#     self.assertTrue(result)
 
 
 
