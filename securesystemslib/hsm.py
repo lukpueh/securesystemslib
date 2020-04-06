@@ -72,7 +72,7 @@ try:
   from cryptography.hazmat.backends import default_backend
   from cryptography.hazmat.primitives import serialization, asymmetric
 
-except ImportError:
+except ImportError: # pragma: no cover
   CRYPTO = False
 
 try:
@@ -80,7 +80,7 @@ try:
   import PyKCS11
   PKCS11 = PyKCS11.PyKCS11Lib()
 
-except ImportError as e:
+except ImportError as e: # pragma: no cover
   # Missing PyKCS11 python library. PKCS11 must remain 'None'.
   logger.debug(e)
 
@@ -125,7 +125,7 @@ def load_pkcs11_lib(path=None):
     False if it failed.
 
   """
-  if PKCS11 is None:
+  if PKCS11 is None: # pragma: no cover
     raise UnsupportedLibraryError(NO_PKCS11_PY_LIB_MSG)
 
   global PKCS11_DYN_LIB
@@ -160,7 +160,7 @@ def get_hsms():
     List of HSM info dictionaries conforming to HSM_INFO_SCHEMA.
 
   """
-  if PKCS11 is None:
+  if PKCS11 is None: # pragma: no cover
     raise UnsupportedLibraryError(NO_PKCS11_PY_LIB_MSG)
 
   if not PKCS11_DYN_LIB:
@@ -205,7 +205,7 @@ def get_keys_on_hsm(hsm_info, user_pin=None):
     List of dictionaries conforming to HSM_KEY_INFO_SCHEMA.
 
   """
-  if PKCS11 is None:
+  if PKCS11 is None: # pragma: no cover
     raise UnsupportedLibraryError(NO_PKCS11_PY_LIB_MSG)
 
   if not PKCS11_DYN_LIB:
@@ -274,10 +274,10 @@ def export_pubkey(hsm_info, hsm_key_id, scheme, sslib_key_id):
     An ECDSA public key dictionary conforming to PUBLIC_KEY_SCHEMA.
 
   """
-  if PKCS11 is None:
+  if PKCS11 is None: # pragma: no cover
     raise UnsupportedLibraryError(NO_PKCS11_PY_LIB_MSG)
 
-  if not CRYPTO:
+  if not CRYPTO: # pragma: no cover
     raise UnsupportedLibraryError(NO_CRYPTO_MSG)
 
   if not PKCS11_DYN_LIB:
@@ -390,10 +390,10 @@ def create_signature(hsm_info, hsm_key_id, user_pin, data, scheme,
     A signature dictionary conforming to SIGNATURE_SCHEMA.
 
   """
-  if PKCS11 is None:
+  if PKCS11 is None: # pragma: no cover
     raise UnsupportedLibraryError(NO_PKCS11_PY_LIB_MSG)
 
-  if not CRYPTO:
+  if not CRYPTO: # pragma: no cover
     raise UnsupportedLibraryError(NO_CRYPTO_MSG)
 
   if not PKCS11_DYN_LIB:
