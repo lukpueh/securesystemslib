@@ -14,30 +14,36 @@
   Test cases for hsm.py module.
 
 """
-
 import os
 import six
 import shutil
 import unittest
 import tempfile
 
-
-# We neither have these dependencies nor run the tests (see skipIf) on PY2
 if not six.PY2:
+  # These modules are not available on Python 2
   import PyKCS11
   from asn1crypto.keys import ECDomainParameters, NamedCurve
+
+  # Although the hsm module remains importable on Python 2 (see tox purepy27)
+  # don't import it here, so that it is excluded from the coverage report.
+  import securesystemslib.hsm
+  from securesystemslib.hsm import (ECDSA_SHA2_NISTP256, ECDSA_SHA2_NISTP384)
 
 import securesystemslib.exceptions
 import securesystemslib.formats
 import securesystemslib.keys
 import securesystemslib.hash
-import securesystemslib.hsm
-from securesystemslib.hsm import (ECDSA_SHA2_NISTP256, ECDSA_SHA2_NISTP384)
+
+
+def setUpModule():
+  if six.PY2:
+    raise unittest.SkipTest("HSM interface not supported on Python 2")
+
 
 # TODO: remove
 os.environ["PYKCS11LIB"] = "/usr/local/lib/softhsm/libsofthsm2.so"
 
-@unittest.skipIf(six.PY2, "HSM interface not supported on Python 2")
 class SoftHSMTestCase(unittest.TestCase):
   """
   Class to load PKCS11 dynamic library, set up SoftHSM in a temporary
@@ -221,7 +227,6 @@ def _pre_hash(data, scheme):
 
 
 # TODO: Remove here, add as example usage in README.md
-@unittest.skipIf(six.PY2, "HSM interface not supported on Python 2")
 @unittest.skipUnless(os.environ.get("LUKPUEH_YUBI_PIN", None),
     "tmp local testing")
 class TestECDSAOnLUKPUEHsYubiKey(unittest.TestCase):
