@@ -274,11 +274,11 @@ def export_pubkey(hsm_info, hsm_key_id, scheme, sslib_key_id):
     An ECDSA public key dictionary conforming to PUBLIC_KEY_SCHEMA.
 
   """
-  if not CRYPTO:
-    raise UnsupportedLibraryError(NO_CRYPTO_MSG)
-
   if PKCS11 is None:
     raise UnsupportedLibraryError(NO_PKCS11_PY_LIB_MSG)
+
+  if not CRYPTO:
+    raise UnsupportedLibraryError(NO_CRYPTO_MSG)
 
   if not PKCS11_DYN_LIB:
     raise UnsupportedLibraryError(NO_PKCS11_DYN_LIB_MSG)
@@ -390,11 +390,11 @@ def create_signature(hsm_info, hsm_key_id, user_pin, data, scheme,
     A signature dictionary conforming to SIGNATURE_SCHEMA.
 
   """
-  if not CRYPTO:
-    raise UnsupportedLibraryError(NO_CRYPTO_MSG)
-
   if PKCS11 is None:
     raise UnsupportedLibraryError(NO_PKCS11_PY_LIB_MSG)
+
+  if not CRYPTO:
+    raise UnsupportedLibraryError(NO_CRYPTO_MSG)
 
   if not PKCS11_DYN_LIB:
     raise UnsupportedLibraryError(NO_PKCS11_DYN_LIB_MSG)
