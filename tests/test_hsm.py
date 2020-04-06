@@ -250,34 +250,34 @@ def _pre_hash(data, scheme):
 
 
 # TODO: Remove here, add as example usage in README.md
-# @unittest.skipUnless(os.environ.get("LUKPUEH_YUBI_PIN", None),
-#     "tmp local testing")
-# class TestECDSAOnLUKPUEHsYubiKey(unittest.TestCase):
-#   @classmethod
-#   def setUpClass(cls):
-#     cls.user_pin = os.environ["LUKPUEH_YUBI_PIN"]
+@unittest.skipUnless(os.environ.get("LUKPUEH_YUBI_PIN", None),
+    "tmp local testing")
+class TestECDSAOnLUKPUEHsYubiKey(unittest.TestCase):
+  @classmethod
+  def setUpClass(cls):
+    cls.user_pin = os.environ["LUKPUEH_YUBI_PIN"]
 
-#     securesystemslib.hsm.load_pkcs11_lib(
-#         "/usr/local/Cellar/yubico-piv-tool/2.0.0/lib/libykcs11.dylib")
+    securesystemslib.hsm.load_pkcs11_lib(
+        "/usr/local/Cellar/yubico-piv-tool/2.0.0/lib/libykcs11.dylib")
 
-#     cls.hsm_info = securesystemslib.hsm.get_hsms().pop()
-#     cls.sslib_key_id = "123456"
-#     cls.data = b"Hello world"
+    cls.hsm_info = securesystemslib.hsm.get_hsms().pop()
+    cls.sslib_key_id = "123456"
+    cls.data = b"Hello world"
 
-#   def test_key(self):
-#     scheme = ECDSA_SHA2_NISTP256
-#     hsm_key_id = (0x02, )
+  def test_key(self):
+    scheme = ECDSA_SHA2_NISTP256
+    hsm_key_id = (0x02, )
 
-#     public_key = securesystemslib.hsm.export_pubkey(
-#         self.hsm_info, hsm_key_id, scheme, self.sslib_key_id)
+    public_key = securesystemslib.hsm.export_pubkey(
+        self.hsm_info, hsm_key_id, scheme, self.sslib_key_id)
 
-#     signature = securesystemslib.hsm.create_signature(
-#         self.hsm_info, hsm_key_id, self.user_pin, self.data, scheme,
-#         self.sslib_key_id)
+    signature = securesystemslib.hsm.create_signature(
+        self.hsm_info, hsm_key_id, self.user_pin, self.data, scheme,
+        self.sslib_key_id)
 
-#     result = securesystemslib.keys.verify_signature(
-#         public_key, signature, self.data)
-#     self.assertTrue(result)
+    result = securesystemslib.keys.verify_signature(
+        public_key, signature, self.data)
+    self.assertTrue(result)
 
 
 
