@@ -100,10 +100,13 @@ class TestInterfaceFunctions(unittest.TestCase):
     self.assertTrue(os.path.exists(test_keypath + '.pub'))
     self.assertEqual(returned_path, test_keypath)
 
-    # If an empty string is given for 'password', the private key file
-    # is written to disk unencrypted.
-    interface.generate_and_write_rsa_keypair(test_keypath_unencrypted,
-        password='')
+    # Raise value error on empty 'password'
+    with self.assertRaises(ValueError):
+      interface.generate_and_write_rsa_keypair(test_keypath_unencrypted,
+          password="")
+
+    # Create unencrypted key, if no password is passed
+    interface.generate_and_write_rsa_keypair(test_keypath_unencrypted)
     self.assertTrue(os.path.exists(test_keypath_unencrypted))
     self.assertTrue(os.path.exists(test_keypath_unencrypted + '.pub'))
 
@@ -175,6 +178,10 @@ class TestInterfaceFunctions(unittest.TestCase):
       interface.generate_and_write_rsa_keypair, test_keypath, bits=1024,
       password='pw')
 
+    # Test unallowed 'password' and 'prompt=True'
+    with self.assertRaises(ValueError):
+      interface.generate_and_write_rsa_keypair(test_keypath, password='pw',
+          prompt=True)
 
 
   def test_import_rsa_privatekey_from_file(self):
@@ -281,10 +288,9 @@ class TestInterfaceFunctions(unittest.TestCase):
     self.assertTrue(os.path.exists(test_keypath + '.pub'))
     self.assertEqual(returned_path, test_keypath)
 
-    # If an empty string is given for 'password', the private key file
-    # is written to disk unencrypted.
-    interface.generate_and_write_ed25519_keypair(test_keypath_unencrypted,
-                                                 password='')
+    # If no 'password' is given, the private key file is written to disk
+    # unencrypted
+    interface.generate_and_write_ed25519_keypair(test_keypath_unencrypted)
     self.assertTrue(os.path.exists(test_keypath_unencrypted))
     self.assertTrue(os.path.exists(test_keypath_unencrypted + '.pub'))
 
@@ -353,6 +359,10 @@ class TestInterfaceFunctions(unittest.TestCase):
     self.assertRaises(securesystemslib.exceptions.FormatError,
         interface.generate_and_write_rsa_keypair, test_keypath, password=3)
 
+    # Test unallowed 'password' and 'prompt=True'
+    with self.assertRaises(ValueError):
+      interface.generate_and_write_ed25519_keypair(test_keypath, password='pw',
+          prompt=True)
 
 
   def test_import_ed25519_publickey_from_file(self):
@@ -506,6 +516,10 @@ class TestInterfaceFunctions(unittest.TestCase):
     self.assertRaises(securesystemslib.exceptions.FormatError,
         interface.generate_and_write_ecdsa_keypair, test_keypath, password=3)
 
+    # Test unallowed 'password' and 'prompt=True'
+    with self.assertRaises(ValueError):
+      interface.generate_and_write_ecdsa_keypair(test_keypath, password='pw',
+          prompt=True)
 
 
   def test_import_ecdsa_publickey_from_file(self):
