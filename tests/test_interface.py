@@ -208,8 +208,8 @@ class TestInterfaceFunctions(unittest.TestCase):
     with self.assertRaises(securesystemslib.exceptions.FormatError):
       interface.import_rsa_privatekey_from_file(key_filepath, 123)
 
-    # Test unallowed empty 'password'
-    with self.assertRaises(ValueError):
+    # Test decryption error with wrong (empty) 'password'
+    with self.assertRaises(securesystemslib.exceptions.CryptoError):
       interface.import_rsa_privatekey_from_file(key_filepath, '')
 
     # Test unallowed passing 'prompt' and 'password'
@@ -305,10 +305,9 @@ class TestInterfaceFunctions(unittest.TestCase):
                                                     password='pw',
                                                     prompt=True)
 
-    # Fail importing encrypted key passing an empty string for passwd 
-    with self.assertRaises(ValueError):
-      interface.import_ed25519_privatekey_from_file(test_keypath,
-                                                    password='')
+    # Fail decryption with wrong passwd
+    with self.assertRaises(securesystemslib.exceptions.CryptoError):
+      interface.import_ed25519_privatekey_from_file(test_keypath, password='')
 
     # Try to import the unencrypted key file, by not passing a password
     imported_privkey = \
@@ -571,11 +570,17 @@ class TestInterfaceFunctions(unittest.TestCase):
       interface.import_ecdsa_privatekey_from_file(ecdsa_keypath, 'pw')
     self.assertTrue(securesystemslib.formats.ECDSAKEY_SCHEMA.matches(imported_ecdsa_key))
 
+    # Test import with prompted password
+    with mock.patch('securesystemslib.interface.get_password',
+        return_value='pw'):
+      imported_ecdsa_key = interface.import_ecdsa_privatekey_from_file(
+          ecdsa_keypath, prompt=True)
+      self.assertTrue(securesystemslib.formats.ECDSAKEY_SCHEMA.matches(
+          imported_ecdsa_key))
 
     # Test improperly formatted argument.
     self.assertRaises(securesystemslib.exceptions.FormatError,
         interface.import_ecdsa_privatekey_from_file, 3, 'pw')
-
 
     # Test invalid argument.
     # Non-existent key file.
@@ -616,6 +621,14 @@ class TestInterfaceFunctions(unittest.TestCase):
     self.assertRaises(securesystemslib.exceptions.FormatError,
         interface.import_ecdsa_privatekey_from_file, ecdsa_keypath, 'pw')
 
+    # Test unallowed passing 'prompt' and 'password'
+    with self.assertRaises(ValueError):
+      interface.import_rsa_privatekey_from_file(ecdsa_keypath,
+          password='pw', prompt=True)
+
+    # Test decryption error with wrong (empty) 'password'
+    with self.assertRaises(securesystemslib.exceptions.CryptoError):
+      interface.import_rsa_privatekey_from_file(ecdsa_keypath, '')
 
 
   def test_import_public_keys_from_file(self):
