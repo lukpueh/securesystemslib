@@ -683,6 +683,10 @@ def create_rsa_public_and_private_from_pem(pem, passphrase=None):
     # Raise 'securesystemslib.exceptions.CryptoError' and pyca/cryptography's
     # exception message.  Avoid propogating pyca/cryptography's exception trace
     # to avoid revealing sensitive error.
+    # FIXME: Error message seems odd if the passed string is not encrypted
+    # and/or not a PEM. PEMRSA_SCHEMA, which is checked above, just aliases
+    # AnyString. The caught error (pyca/cryptography) should be enough and
+    # seems more accurate.
     raise securesystemslib.exceptions.CryptoError('RSA (public, private) tuple'
       ' cannot be generated from the encrypted PEM string: ' + str(e))
 
