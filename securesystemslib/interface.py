@@ -121,6 +121,31 @@ def get_password(prompt='Password: ', confirm=False):
 
 
 
+def _get_key_file_decryption_password(password, prompt, path):
+  """Decryption password prompt helper. """
+
+  # Allow either pw or prompt so we don't have to decide which takes precedence
+  if password is not None and prompt:
+    raise ValueError("passing 'password' and 'prompt=True' is not allowed")
+
+  # Prompt for pw and treat empty pw as no pw. On the prompt one can only
+  # indicate that decryption is unneeded by entering no pw, i.e. empty string.
+  if prompt:
+    password = get_password("enter password to decrypt private key file "
+        "'" + TERM_RED + path + TERM_RESET + "' "
+        "(leave empty if key not encrypted): '", confirm=False)
+
+    if len(password) == 0:
+      password = None
+
+  # Only check that passed or entered password is a string. We don't care about
+  # the strength (e.g. length) of the decryption password.
+  if password is not None:
+    securesystemslib.formats.PASSWORD_SCHEMA.check_match(password)
+
+  return password
+
+
 
 def generate_and_write_rsa_keypair(filepath=None, bits=DEFAULT_RSA_KEY_BITS,
     password=None):
@@ -293,51 +318,9 @@ def import_rsa_privatekey_from_file(filepath, password=None,
     An RSA key object, conformant to 'securesystemslib.formats.RSAKEY_SCHEMA'.
 
   """
-
-  # Does 'filepath' have the correct format?
-  # Ensure the arguments have the appropriate number of objects and object
-  # types, and that all dict keys are properly named.
-  # Raise 'securesystemslib.exceptions.FormatError' if there is a mismatch.
   securesystemslib.formats.PATH_SCHEMA.check_match(filepath)
-
-  # Is 'scheme' properly formatted?
   securesystemslib.formats.RSA_SCHEME_SCHEMA.check_match(scheme)
-
-  if password and prompt:
-    raise ValueError("Passing 'password' and 'prompt' True is not allowed.")
-
-  # If 'password' was passed check format and that it is not empty.
-  if password is not None:
-    securesystemslib.formats.PASSWORD_SCHEMA.check_match(password)
-
-    # TODO: PASSWORD_SCHEMA should be securesystemslib.schema.AnyString(min=1)
-    if not len(password):
-      raise ValueError('Password must be 1 or more characters')
-
-  elif prompt:
-    # Password confirmation disabled here, which should ideally happen only
-    # when creating encrypted key files (i.e., improve usability).
-    # It is safe to specify the full path of 'filepath' in the prompt and not
-    # worry about leaking sensitive information about the key's location.
-    # However, care should be taken when including the full path in exceptions
-    # and log files.
-    # NOTE: A user who gets prompted for a password, can only signal that the
-    # key is not encrypted by entering no password in the prompt, as opposed
-    # to a programmer who can call the function with or without a 'password'.
-    # Hence, we treat an empty password here, as if no 'password' was passed.
-    password = get_password('Enter a password for an encrypted RSA'
-        ' file \'' + TERM_RED + filepath + TERM_RESET + '\': ',
-        confirm=False) or None
-
-  if password is not None:
-    # This check will not fail, because a mal-formatted passed password fails
-    # above and an entered password will always be a string (see get_password)
-    # However, we include it in case PASSWORD_SCHEMA or get_password changes.
-    securesystemslib.formats.PASSWORD_SCHEMA.check_match(password)
-
-  else:
-    logger.debug('No password was given. Attempting to import an'
-        ' unencrypted file.')
+  password = _get_key_file_decryption_password(password, prompt, filepath)
 
   if storage_backend is None:
     storage_backend = securesystemslib.storage.FilesystemBackend()
@@ -636,55 +619,21 @@ def import_ed25519_privatekey_from_file(filepath, password=None, prompt=False,
   <Returns>
     An ed25519 key object of the form:
     'securesystemslib.formats.ED25519KEY_SCHEMA'.
+
   """
-
-  # Does 'filepath' have the correct format?
-  # Ensure the arguments have the appropriate number of objects and object
-  # types, and that all dict keys are properly named.
-  # Raise 'securesystemslib.exceptions.FormatError' if there is a mismatch.
   securesystemslib.formats.PATH_SCHEMA.check_match(filepath)
-
-  if password and prompt:
-    raise ValueError("Passing 'password' and 'prompt' True is not allowed.")
+  password = _get_key_file_decryption_password(password, prompt, filepath)
 
   if storage_backend is None:
     storage_backend = securesystemslib.storage.FilesystemBackend()
-
-  # If 'password' was passed check format and that it is not empty.
-  if password is not None:
-    securesystemslib.formats.PASSWORD_SCHEMA.check_match(password)
-
-    # TODO: PASSWORD_SCHEMA should be securesystemslib.schema.AnyString(min=1)
-    if not len(password):
-      raise ValueError('Password must be 1 or more characters')
-
-  elif prompt:
-    # Password confirmation disabled here, which should ideally happen only
-    # when creating encrypted key files (i.e., improve usability).
-    # It is safe to specify the full path of 'filepath' in the prompt and not
-    # worry about leaking sensitive information about the key's location.
-    # However, care should be taken when including the full path in exceptions
-    # and log files.
-    # NOTE: A user who gets prompted for a password, can only signal that the
-    # key is not encrypted by entering no password in the prompt, as opposed
-    # to a programmer who can call the function with or without a 'password'.
-    # Hence, we treat an empty password here, as if no 'password' was passed.
-    password = get_password('Enter a password for an encrypted RSA'
-        ' file \'' + TERM_RED + filepath + TERM_RESET + '\': ',
-        confirm=False)
-
-    # If user sets an empty string for the password, explicitly set the
-    # password to None, because some functions may expect this later.
-    if len(password) == 0: # pragma: no cover
-      password = None
 
   # Finally, regardless of password, try decrypting the key, if necessary.
   # Otherwise, load it straight from storage.
   with storage_backend.get(filepath) as file_object:
     json_str = file_object.read()
 
-  return securesystemslib.keys.\
-      import_ed25519key_from_private_json(json_str, password=password)
+    return securesystemslib.keys.import_ed25519key_from_private_json(
+        json_str, password=password)
 
 
 
@@ -849,7 +798,7 @@ def import_ecdsa_publickey_from_file(filepath):
 
 
 
-def import_ecdsa_privatekey_from_file(filepath, password=None,
+def import_ecdsa_privatekey_from_file(filepath, password=None, prompt=False,
     storage_backend=None):
   """
   <Purpose>
@@ -868,10 +817,16 @@ def import_ecdsa_privatekey_from_file(filepath, password=None,
       encrypted key file 'filepath' must be decrypted before the ECDSA key
       object can be returned.
 
+
+    prompt:
+      If True the user is prompted for a passphrase to decrypt 'filepath'.
+      Default is False.
+
     storage_backend:
       An object which implements
       securesystemslib.storage.StorageBackendInterface. When no object is
       passed a FilesystemBackend will be instantiated and used.
+
 
   <Exceptions>
     securesystemslib.exceptions.FormatError, if the arguments are improperly
@@ -885,29 +840,10 @@ def import_ecdsa_privatekey_from_file(filepath, password=None,
 
   <Returns>
     An ECDSA key object of the form: 'securesystemslib.formats.ECDSAKEY_SCHEMA'.
+
   """
-
-  # Does 'filepath' have the correct format?
-  # Ensure the arguments have the appropriate number of objects and object
-  # types, and that all dict keys are properly named.
-  # Raise 'securesystemslib.exceptions.FormatError' if there is a mismatch.
   securesystemslib.formats.PATH_SCHEMA.check_match(filepath)
-
-  # If the caller does not provide a password argument, prompt for one.
-  # Password confirmation disabled here, which should ideally happen only
-  # when creating encrypted key files (i.e., improve usability).
-  if password is None: # pragma: no cover
-
-    # It is safe to specify the full path of 'filepath' in the prompt and not
-    # worry about leaking sensitive information about the key's location.
-    # However, care should be taken when including the full path in exceptions
-    # and log files.
-    password = get_password('Enter a password for the encrypted ECDSA'
-        ' key (' + TERM_RED + filepath + TERM_RESET + '): ',
-        confirm=False)
-
-  # Does 'password' have the correct format?
-  securesystemslib.formats.PASSWORD_SCHEMA.check_match(password)
+  password = _get_key_file_decryption_password(password, prompt, filepath)
 
   if storage_backend is None:
     storage_backend = securesystemslib.storage.FilesystemBackend()
