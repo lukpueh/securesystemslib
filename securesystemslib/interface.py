@@ -119,6 +119,34 @@ def get_password(prompt='Password: ', confirm=False):
       print('Mismatch; try again.')
 
 
+def _get_key_file_encryption_password(password, prompt, path):
+  """Encryption password prompt and validation helper. """
+
+  # Allow either pw or prompt so we don't have to decide which takes precedence
+  if password is not None and prompt:
+    raise ValueError("passing 'password' and 'prompt=True' is not allowed")
+
+  # Prompt user for pw (+ confirmation) and treat empty pw as *NO* pw. A user
+  # on the prompt can only indicate the desire to not encrypt by entering no
+  # password, i.e. empty string.
+  if prompt:
+    password = get_password("enter password to encrypt private key file "
+        "'" + TERM_RED + path + TERM_RESET + "' (leave empty if key should "
+        "not be encrypted): '", confirm=True)
+
+    if len(password) == 0:
+      password = None
+
+  # Validate passed pw and treat an empty pw as invalid pw. A caller should
+  # indicate the desire to not encrypt by passing None for pw
+  if password is not None:
+    securesystemslib.formats.PASSWORD_SCHEMA.check_match(password)
+
+    if not len(password):
+      # TODO: An ENCRYPTION_PASSWORD_SCHEMA should check this and other things
+      raise ValueError("encryption 'password' must be 1 or more characters long")
+
+  return password
 
 
 def _get_key_file_decryption_password(password, prompt, path):
@@ -148,7 +176,7 @@ def _get_key_file_decryption_password(password, prompt, path):
 
 
 def generate_and_write_rsa_keypair(filepath=None, bits=DEFAULT_RSA_KEY_BITS,
-    password=None):
+    password=None, prompt=False):
   """
   <Purpose>
     Generate an RSA key pair.  The public portion of the generated RSA key is
@@ -191,6 +219,7 @@ def generate_and_write_rsa_keypair(filepath=None, bits=DEFAULT_RSA_KEY_BITS,
   # Does 'bits' have the correct format?
   # Raise 'securesystemslib.exceptions.FormatError' if there is a mismatch.
   securesystemslib.formats.RSAKEYBITS_SCHEMA.check_match(bits)
+  password = _get_key_file_encryption_password(password, prompt, filepath)
 
   # Generate the public and private RSA keys.
   rsa_key = securesystemslib.keys.generate_rsa_key(bits)
@@ -207,29 +236,13 @@ def generate_and_write_rsa_keypair(filepath=None, bits=DEFAULT_RSA_KEY_BITS,
   # Does 'filepath' have the correct format?
   securesystemslib.formats.PATH_SCHEMA.check_match(filepath)
 
-  # If the caller does not provide a password argument, prompt for one.
-  if password is None: # pragma: no cover
-
-    # It is safe to specify the full path of 'filepath' in the prompt and not
-    # worry about leaking sensitive information about the key's location.
-    # However, care should be taken when including the full path in exceptions
-    # and log files.
-    password = get_password('Enter a password for the encrypted RSA'
-        ' key (' + TERM_RED + filepath + TERM_RESET + '): ',
-        confirm=True)
-
-  else:
-    logger.debug('The password has been specified.  Not prompting for one')
-
-  # Does 'password' have the correct format?
-  securesystemslib.formats.PASSWORD_SCHEMA.check_match(password)
 
   # Encrypt the private key if 'password' is set.
-  if len(password):
+  if password is not None:
     private = securesystemslib.keys.create_rsa_encrypted_pem(private, password)
 
   else:
-    logger.debug('An empty password was given.  Not encrypting the private key.')
+    logger.debug('Password is None. Not encrypting the private key.')
 
   # If the parent directory of filepath does not exist,
   # create it (and all its parent directories, if necessary).
@@ -407,7 +420,8 @@ def import_rsa_publickey_from_file(filepath, scheme='rsassa-pss-sha256',
 
 
 
-def generate_and_write_ed25519_keypair(filepath=None, password=None):
+def generate_and_write_ed25519_keypair(filepath=None, password=None,
+    prompt=False):
   """
   <Purpose>
     Generate an Ed25519 keypair, where the encrypted key (using 'password' as
@@ -446,7 +460,8 @@ def generate_and_write_ed25519_keypair(filepath=None, password=None):
     The 'filepath' of the written key.
   """
 
-  # Generate a new Ed25519 key object.
+  password = _get_key_file_encryption_password(password, prompt, filepath)
+
   ed25519_key = securesystemslib.keys.generate_ed25519_key()
 
   if not filepath:
@@ -456,28 +471,7 @@ def generate_and_write_ed25519_keypair(filepath=None, password=None):
     logger.debug('The filepath has been specified.  Not using the key\'s'
         ' KEYID as the default filepath.')
 
-  # Does 'filepath' have the correct format?
-  # Ensure the arguments have the appropriate number of objects and object
-  # types, and that all dict keys are properly named.
-  # Raise 'securesystemslib.exceptions.FormatError' if there is a mismatch.
   securesystemslib.formats.PATH_SCHEMA.check_match(filepath)
-
-  # If the caller does not provide a password argument, prompt for one.
-  if password is None: # pragma: no cover
-
-    # It is safe to specify the full path of 'filepath' in the prompt and not
-    # worry about leaking sensitive information about the key's location.
-    # However, care should be taken when including the full path in exceptions
-    # and log files.
-    password = get_password('Enter a password for the Ed25519'
-        ' key (' + TERM_RED + filepath + TERM_RESET + '): ',
-        confirm=True)
-
-  else:
-    logger.debug('The password has been specified. Not prompting for one.')
-
-  # Does 'password' have the correct format?
-  securesystemslib.formats.PASSWORD_SCHEMA.check_match(password)
 
   # If the parent directory of filepath does not exist,
   # create it (and all its parent directories, if necessary).
@@ -508,7 +502,7 @@ def generate_and_write_ed25519_keypair(filepath=None, password=None):
   file_object = tempfile.TemporaryFile()
 
   # Encrypt the private key if 'password' is set.
-  if len(password):
+  if password is not None:
     ed25519_key = securesystemslib.keys.encrypt_key(ed25519_key, password)
 
   else:
@@ -639,7 +633,8 @@ def import_ed25519_privatekey_from_file(filepath, password=None, prompt=False,
 
 
 
-def generate_and_write_ecdsa_keypair(filepath=None, password=None):
+def generate_and_write_ecdsa_keypair(filepath=None, password=None,
+    prompt=False):
   """
   <Purpose>
     Generate an ECDSA keypair, where the encrypted key (using 'password' as the
@@ -678,6 +673,8 @@ def generate_and_write_ecdsa_keypair(filepath=None, password=None):
     The 'filepath' of the written key.
   """
 
+  password = _get_key_file_encryption_password(password, prompt, filepath)
+
   # Generate a new ECDSA key object.  The 'cryptography' library is currently
   # supported and performs the actual cryptographic operations.
   ecdsa_key = securesystemslib.keys.generate_ecdsa_key()
@@ -692,23 +689,6 @@ def generate_and_write_ecdsa_keypair(filepath=None, password=None):
   # Does 'filepath' have the correct format?
   # Raise 'securesystemslib.exceptions.FormatError' if there is a mismatch.
   securesystemslib.formats.PATH_SCHEMA.check_match(filepath)
-
-  # If the caller does not provide a password argument, prompt for one.
-  if password is None: # pragma: no cover
-
-    # It is safe to specify the full path of 'filepath' in the prompt and not
-    # worry about leaking sensitive information about the key's location.
-    # However, care should be taken when including the full path in exceptions
-    # and log files.
-    password = get_password('Enter a password for the ECDSA'
-        ' key (' + TERM_RED + filepath + TERM_RESET + '): ',
-        confirm=True)
-
-  else:
-    logger.debug('The password has been specified.  Not prompting for one')
-
-  # Does 'password' have the correct format?
-  securesystemslib.formats.PASSWORD_SCHEMA.check_match(password)
 
   # If the parent directory of filepath does not exist,
   # create it (and all its parent directories, if necessary).
