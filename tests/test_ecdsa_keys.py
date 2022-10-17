@@ -32,6 +32,8 @@ FORMAT_ERROR_MSG = (
 
 
 class TestECDSA_keys(unittest.TestCase):
+    """Test ecdsa key generation, signing and verification."""
+
     def setUp(self):
         pass
 

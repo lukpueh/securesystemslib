@@ -35,6 +35,8 @@ DATA = securesystemslib.formats.encode_canonical(DATA_STR).encode("utf-8")
 
 
 class TestKeys(unittest.TestCase):
+    """Test keys API."""
+
     @classmethod
     def setUpClass(cls):
         cls.rsakey_dict = KEYS.generate_rsa_key()

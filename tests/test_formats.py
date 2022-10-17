@@ -25,6 +25,8 @@ import securesystemslib.schema
 
 
 class TestFormats(unittest.TestCase):
+    """Test custom formats and encoding API."""
+
     def setUp(self):
         pass
 

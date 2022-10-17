@@ -36,6 +36,8 @@ logger = logging.getLogger(__name__)
 
 
 class TestUtil(unittest_toolbox.Modified_TestCase):
+    """Test miscellaneous utility functions."""
+
     def setUp(self):
         unittest_toolbox.Modified_TestCase.setUp(self)
         self.temp_fileobj = tempfile.TemporaryFile()

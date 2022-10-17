@@ -51,6 +51,8 @@ import securesystemslib.keys
 
 
 class TestPublicInterfaces(unittest.TestCase):
+    """Test public interfaces without optional dependencies."""
+
     @classmethod
     def setUpClass(cls):
         cls.temp_dir = tempfile.mkdtemp(dir=os.getcwd())

@@ -25,6 +25,8 @@ import securesystemslib.storage
 
 
 class TestStorage(unittest.TestCase):
+    """Test storage.FilesystemBackend methods."""
+
     def setUp(self):
         self.storage_backend = securesystemslib.storage.FilesystemBackend()
         self.temp_dir = tempfile.mkdtemp(dir=os.getcwd())

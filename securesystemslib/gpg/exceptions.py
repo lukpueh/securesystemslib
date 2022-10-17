@@ -42,6 +42,8 @@ class CommandError(Exception):
 
 
 class KeyExpirationError(Exception):
+    """Indicate that GPG key has expired."""
+
     def __init__(self, key):
         super(KeyExpirationError, self).__init__()
         self.key = key

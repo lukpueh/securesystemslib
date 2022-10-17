@@ -39,6 +39,8 @@ FORMAT_ERROR_MSG = (
 
 
 class TestRSA_keys(unittest.TestCase):
+    """Test RSA key generation and encryption, and signing and verification."""
+
     def setUp(self):
         pass
 

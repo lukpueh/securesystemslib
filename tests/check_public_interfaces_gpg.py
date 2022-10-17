@@ -38,6 +38,8 @@ from securesystemslib.gpg.util import get_version
 
 
 class TestPublicInterfacesGPG(unittest.TestCase):
+    """Test public GPG interfaces without gpg."""
+
     @classmethod
     def setUpClass(cls):
         assert (

@@ -31,6 +31,8 @@ FORMAT_ERROR_MSG = (
 
 
 class TestEd25519_keys(unittest.TestCase):
+    """Test ed25519 key generation, and signing and verification."""
+
     def setUp(self):
         pass
 

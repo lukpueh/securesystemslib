@@ -25,6 +25,8 @@ import securesystemslib.schema as SCHEMA
 
 
 class TestSchema(unittest.TestCase):
+    """Test basic schema classes."""
+
     def setUp(self):
         pass
 

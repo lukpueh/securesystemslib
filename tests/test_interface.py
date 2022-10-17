@@ -71,6 +71,8 @@ from securesystemslib.interface import (
 
 
 class TestInterfaceFunctions(unittest.TestCase):
+    """Test key generation and import API."""
+
     @classmethod
     def setUpClass(cls):
         cls.test_data_dir = os.path.join(

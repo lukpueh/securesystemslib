@@ -36,6 +36,8 @@ if "hashlib" not in securesystemslib.hash.SUPPORTED_LIBRARIES:
 
 
 class TestHash(unittest.TestCase):
+    """Test hash API."""
+
     @staticmethod
     def _is_supported_combination(library, algorithm):
         blake_algos = ["blake2b", "blake2b-256", "blake2s"]

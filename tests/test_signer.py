@@ -23,6 +23,8 @@ from securesystemslib.signer import (
 
 
 class TestSSlibSigner(unittest.TestCase):
+    """Test SSlibSigner methods."""
+
     @classmethod
     def setUpClass(cls):
         cls.rsakey_dict = KEYS.generate_rsa_key()
