@@ -28,6 +28,9 @@ jobs:
           - python-version: 3.8
             os: ubuntu-latest
             toxenv: mypy
+          - python-version: 3.x
+            os: ubuntu-latest
+            toxenv: lint
 
     runs-on: ${{ matrix.os }}
 
