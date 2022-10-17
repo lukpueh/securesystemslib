@@ -24,18 +24,18 @@ log = logging.getLogger(__name__)
 
 
 def is_available_gnupg(gnupg):
-  gpg_version_cmd = gnupg + " --version"
-  try:
-    process.run(gpg_version_cmd, stdout=process.PIPE, stderr=process.PIPE)
-    return True
-  except OSError:
-    return False
+    gpg_version_cmd = gnupg + " --version"
+    try:
+        process.run(gpg_version_cmd, stdout=process.PIPE, stderr=process.PIPE)
+        return True
+    except OSError:
+        return False
 
 
 GPG_COMMAND = ""
 HAVE_GPG = False
 
-GPG_ENV_COMMAND = os.environ.get('GNUPG')
+GPG_ENV_COMMAND = os.environ.get("GNUPG")
 GPG2_COMMAND = "gpg2"
 GPG1_COMMAND = "gpg"
 
@@ -43,24 +43,27 @@ GPG1_COMMAND = "gpg"
 # assuming gpg2 as default value and test if exists. Otherwise, we assume gpg
 # exists.
 if GPG_ENV_COMMAND:
-  if is_available_gnupg(GPG_ENV_COMMAND):
-    GPG_COMMAND = GPG_ENV_COMMAND
+    if is_available_gnupg(GPG_ENV_COMMAND):
+        GPG_COMMAND = GPG_ENV_COMMAND
 elif is_available_gnupg(GPG2_COMMAND):
-  GPG_COMMAND = GPG2_COMMAND
+    GPG_COMMAND = GPG2_COMMAND
 elif is_available_gnupg(GPG1_COMMAND):
-  GPG_COMMAND = GPG1_COMMAND
+    GPG_COMMAND = GPG1_COMMAND
 
 if GPG_COMMAND:
-  # Use bool to skip tests or fail early and gracefully if no gpg is available
-  HAVE_GPG = True
+    # Use bool to skip tests or fail early and gracefully if no gpg is available
+    HAVE_GPG = True
 
 GPG_VERSION_COMMAND = GPG_COMMAND + " --version"
 FULLY_SUPPORTED_MIN_VERSION = "2.1.0"
-NO_GPG_MSG = "GPG support requires a GPG client. 'gpg2' or 'gpg' with version {} or newer is" \
-  " fully supported.".format(FULLY_SUPPORTED_MIN_VERSION)
+NO_GPG_MSG = (
+    "GPG support requires a GPG client. 'gpg2' or 'gpg' with version {} or newer is"
+    " fully supported.".format(FULLY_SUPPORTED_MIN_VERSION)
+)
 
-GPG_SIGN_COMMAND = GPG_COMMAND + \
-                   " --detach-sign --digest-algo SHA256 {keyarg} {homearg}"
+GPG_SIGN_COMMAND = (
+    GPG_COMMAND + " --detach-sign --digest-algo SHA256 {keyarg} {homearg}"
+)
 GPG_EXPORT_PUBKEY_COMMAND = GPG_COMMAND + " {homearg} --export {keyid}"
 
 # See RFC4880 section 4.3. Packet Tags for a list of all packet types The
