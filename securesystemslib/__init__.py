@@ -1,3 +1,6 @@
+"""securesystemslib
+"""
+
 import logging
 
 # Configure a basic 'securesystemslib' top-level logger with a StreamHandler
