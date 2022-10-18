@@ -202,7 +202,9 @@ class FilesystemBackend(StorageBackendInterface):
             file_object = open(filepath, "rb")
             yield file_object
         except OSError:
-            raise exceptions.StorageError("Can't open %s" % filepath)
+            raise exceptions.StorageError(
+                "Can't open %s" % filepath
+            )  # pylint: disable=raise-missing-from,consider-using-f-string
         finally:
             if file_object is not None:
                 file_object.close()
@@ -246,7 +248,9 @@ class FilesystemBackend(StorageBackendInterface):
                 destination_file.flush()
                 os.fsync(destination_file.fileno())
         except OSError:
-            raise exceptions.StorageError("Can't write file %s" % filepath)
+            raise exceptions.StorageError(
+                "Can't write file %s" % filepath
+            )  # pylint: disable=raise-missing-from,consider-using-f-string
 
     def remove(self, filepath: str) -> None:
         try:
@@ -256,13 +260,17 @@ class FilesystemBackend(StorageBackendInterface):
             PermissionError,
             OSError,
         ):  # pragma: no cover
-            raise exceptions.StorageError("Can't remove file %s" % filepath)
+            raise exceptions.StorageError(
+                "Can't remove file %s" % filepath
+            )  # pylint: disable=raise-missing-from,consider-using-f-string
 
     def getsize(self, filepath: str) -> int:
         try:
             return os.path.getsize(filepath)
         except OSError:
-            raise exceptions.StorageError("Can't access file %s" % filepath)
+            raise exceptions.StorageError(
+                "Can't access file %s" % filepath
+            )  # pylint: disable=raise-missing-from,consider-using-f-string
 
     def create_folder(self, filepath: str) -> None:
         try:
@@ -279,11 +287,14 @@ class FilesystemBackend(StorageBackendInterface):
                 )
             else:
                 raise exceptions.StorageError(
-                    "Can't create folder at %s" % filepath
+                    "Can't create folder at %s"
+                    % filepath  # pylint: disable=consider-using-f-string
                 )
 
     def list_folder(self, filepath: str) -> List[str]:
         try:
             return os.listdir(filepath)
         except FileNotFoundError:
-            raise exceptions.StorageError("Can't list folder at %s" % filepath)
+            raise exceptions.StorageError(
+                "Can't list folder at %s" % filepath
+            )  # pylint: disable=raise-missing-from,consider-using-f-string

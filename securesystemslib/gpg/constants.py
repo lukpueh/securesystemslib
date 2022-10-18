@@ -57,7 +57,7 @@ if GPG_COMMAND:
 GPG_VERSION_COMMAND = GPG_COMMAND + " --version"
 FULLY_SUPPORTED_MIN_VERSION = "2.1.0"
 NO_GPG_MSG = (
-    "GPG support requires a GPG client. 'gpg2' or 'gpg' with version {} or newer is"
+    "GPG support requires a GPG client. 'gpg2' or 'gpg' with version {} or newer is"  # pylint: disable=consider-using-f-string
     " fully supported.".format(FULLY_SUPPORTED_MIN_VERSION)
 )
 

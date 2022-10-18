@@ -25,9 +25,16 @@ try:
 except ImportError:
     CRYPTO = False
 
-from securesystemslib import exceptions, formats
-from securesystemslib.gpg import util as gpg_util
-from securesystemslib.gpg.exceptions import PacketParsingError
+from securesystemslib import (  # pylint: disable=wrong-import-position
+    exceptions,
+    formats,
+)
+from securesystemslib.gpg import (
+    util as gpg_util,  # pylint: disable=wrong-import-position
+)
+from securesystemslib.gpg.exceptions import (  # pylint: disable=wrong-import-position
+    PacketParsingError,
+)
 
 
 def create_pubkey(pubkey_info):
@@ -199,7 +206,9 @@ def verify_signature(signature_object, pubkey_info, content, hash_algorithm_id):
     signature_length = len(signature_object["signature"])
     if pubkey_length != signature_length:  # pragma: no cover
         zero_pad = "0" * (pubkey_length - signature_length)
-        signature_object["signature"] = "{}{}".format(
+        signature_object[
+            "signature"
+        ] = "{}{}".format(  # pylint: disable=consider-using-f-string
             zero_pad, signature_object["signature"]
         )
 
