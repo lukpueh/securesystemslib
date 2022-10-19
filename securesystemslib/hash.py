@@ -101,9 +101,9 @@ try:
 
         def digest(self):
             digest_obj_copy = self._digest_obj.copy()
-            digest = (
+            digest = (  # pylint: disable=redefined-outer-name
                 self._digest_obj.finalize()
-            )  # pylint: disable=redefined-outer-name
+            )
             self._digest_obj = digest_obj_copy
             return digest
 
@@ -187,9 +187,9 @@ def digest(algorithm=DEFAULT_HASH_ALGORITHM, hash_library=DEFAULT_HASH_LIBRARY):
         except (ValueError, TypeError):
             # ValueError: the algorithm value was unknown
             # TypeError: unexpected argument digest_size (on old python)
-            raise exceptions.UnsupportedAlgorithmError(
+            raise exceptions.UnsupportedAlgorithmError(  # pylint: disable=raise-missing-from
                 algorithm
-            )  # pylint: disable=raise-missing-from
+            )
 
     # Was a pyca_crypto digest object requested and is it supported?
     elif hash_library == "pyca_crypto" and hash_library in SUPPORTED_LIBRARIES:
@@ -200,9 +200,9 @@ def digest(algorithm=DEFAULT_HASH_ALGORITHM, hash_library=DEFAULT_HASH_LIBRARY):
             )
 
         except KeyError:
-            raise exceptions.UnsupportedAlgorithmError(
+            raise exceptions.UnsupportedAlgorithmError(  # pylint: disable=raise-missing-from
                 algorithm
-            )  # pylint: disable=raise-missing-from
+            )
 
     # The requested hash library is not supported.
     else:

@@ -1,4 +1,7 @@
-import logging  # pylint: disable=missing-module-docstring
+"""securesystemslib
+"""
+
+import logging
 
 # Configure a basic 'securesystemslib' top-level logger with a StreamHandler
 # (print to console) and the WARNING log level (print messages of type

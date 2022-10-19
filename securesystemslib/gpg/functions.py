@@ -105,15 +105,19 @@ def create_signature(content, keyid=None, homedir=None):
     keyarg = ""
     if keyid:
         formats.KEYID_SCHEMA.check_match(keyid)
-        keyarg = "--local-user {}".format(
-            keyid
-        )  # pylint: disable=consider-using-f-string
+        keyarg = (
+            "--local-user {}".format(  # pylint: disable=consider-using-f-string
+                keyid
+            )
+        )
 
     homearg = ""
     if homedir:
-        homearg = "--homedir {}".format(homedir).replace(
-            "\\", "/"
-        )  # pylint: disable=consider-using-f-string
+        homearg = (
+            "--homedir {}".format(  # pylint: disable=consider-using-f-string
+                homedir
+            ).replace("\\", "/")
+        )
 
     command = GPG_SIGN_COMMAND.format(keyarg=keyarg, homearg=homearg)
 
@@ -294,9 +298,11 @@ def export_pubkey(keyid, homedir=None):
 
     homearg = ""
     if homedir:
-        homearg = "--homedir {}".format(homedir).replace(
-            "\\", "/"
-        )  # pylint: disable=consider-using-f-string
+        homearg = (
+            "--homedir {}".format(  # pylint: disable=consider-using-f-string
+                homedir
+            ).replace("\\", "/")
+        )
 
     # TODO: Consider adopting command error handling from `create_signature`
     # above, e.g. in a common 'run gpg command' utility function

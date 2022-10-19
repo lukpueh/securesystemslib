@@ -210,9 +210,9 @@ class TestInterfaceFunctions(
 
             with self.assertRaises(
                 ValueError,
-                msg="(row {})".format(
+                msg="(row {})".format(  # pylint: disable=consider-using-f-string
                     idx
-                ),  # pylint: disable=consider-using-f-string
+                ),
             ) as ctx:
                 _generate_and_write_rsa_keypair(**kwargs)
 
@@ -235,8 +235,11 @@ class TestInterfaceFunctions(
             ]
         ):
             with self.assertRaises(
-                FormatError, msg="(row {})".format(idx)
-            ):  # pylint: disable=consider-using-f-string
+                FormatError,
+                msg="(row {})".format(  # pylint: disable=consider-using-f-string
+                    idx
+                ),
+            ):
                 _generate_and_write_rsa_keypair(**kwargs)
 
         # TEST: Import errors
@@ -248,9 +251,9 @@ class TestInterfaceFunctions(
 
         self.assertTrue(
             err_msg in str(ctx.exception),
-            "expected: '{}' got: '{}'".format(
+            "expected: '{}' got: '{}'".format(  # pylint: disable=consider-using-f-string
                 err_msg, ctx.exception
-            ),  # pylint: disable=consider-using-f-string
+            ),
         )
 
         # Error on private key import...
@@ -302,8 +305,11 @@ class TestInterfaceFunctions(
         ):
 
             with self.assertRaises(
-                err, msg="(row {})".format(idx)
-            ) as ctx:  # pylint: disable=consider-using-f-string
+                err,
+                msg="(row {})".format(  # pylint: disable=consider-using-f-string
+                    idx
+                ),
+            ) as ctx:
                 import_rsa_privatekey_from_file(*args, **kwargs)
 
             self.assertTrue(
@@ -322,9 +328,9 @@ class TestInterfaceFunctions(
 
         self.assertTrue(
             err_msg in str(ctx.exception),
-            "expected: '{}' got: '{}'".format(
+            "expected: '{}' got: '{}'".format(  # pylint: disable=consider-using-f-string
                 err_msg, ctx.exception
-            ),  # pylint: disable=consider-using-f-string
+            ),
         )
 
         # Error on bad argument format
@@ -336,12 +342,18 @@ class TestInterfaceFunctions(
             ]
         ):
             with self.assertRaises(
-                FormatError, msg="(row {})".format(idx)
-            ):  # pylint: disable=consider-using-f-string
+                FormatError,
+                msg="(row {})".format(  # pylint: disable=consider-using-f-string
+                    idx
+                ),
+            ):
                 import_rsa_publickey_from_file(*args, **kwargs)
             with self.assertRaises(
-                FormatError, msg="(row {})".format(idx)
-            ):  # pylint: disable=consider-using-f-string
+                FormatError,
+                msg="(row {})".format(  # pylint: disable=consider-using-f-string
+                    idx
+                ),
+            ):
                 import_rsa_privatekey_from_file(*args, **kwargs)
 
         # bad password
@@ -456,9 +468,9 @@ class TestInterfaceFunctions(
 
             with self.assertRaises(
                 ValueError,
-                msg="(row {})".format(
+                msg="(row {})".format(  # pylint: disable=consider-using-f-string
                     idx
-                ),  # pylint: disable=consider-using-f-string
+                ),
             ) as ctx:
                 _generate_and_write_ed25519_keypair(**kwargs)
 
@@ -479,8 +491,11 @@ class TestInterfaceFunctions(
             ]
         ):
             with self.assertRaises(
-                FormatError, msg="(row {})".format(idx)
-            ):  # pylint: disable=consider-using-f-string
+                FormatError,
+                msg="(row {})".format(  # pylint: disable=consider-using-f-string
+                    idx
+                ),
+            ):
                 _generate_and_write_ed25519_keypair(**kwargs)
 
         # TEST: Import errors
@@ -496,8 +511,11 @@ class TestInterfaceFunctions(
             ]
         ):
             with self.assertRaises(
-                Error, msg="(row {})".format(idx)
-            ) as ctx:  # pylint: disable=consider-using-f-string
+                Error,
+                msg="(row {})".format(  # pylint: disable=consider-using-f-string
+                    idx
+                ),
+            ) as ctx:
                 import_ed25519_publickey_from_file(fn)
 
             self.assertTrue(
@@ -558,8 +576,11 @@ class TestInterfaceFunctions(
         ):
 
             with self.assertRaises(
-                err, msg="(row {})".format(idx)
-            ) as ctx:  # pylint: disable=consider-using-f-string
+                err,
+                msg="(row {})".format(  # pylint: disable=consider-using-f-string
+                    idx
+                ),
+            ) as ctx:
                 import_ed25519_privatekey_from_file(*args, **kwargs)
 
             self.assertTrue(
@@ -581,9 +602,9 @@ class TestInterfaceFunctions(
 
         self.assertTrue(
             err_msg in str(ctx.exception),
-            "expected: '{}' got: '{}'".format(
+            "expected: '{}' got: '{}'".format(  # pylint: disable=consider-using-f-string
                 err_msg, ctx.exception
-            ),  # pylint: disable=consider-using-f-string
+            ),
         )
 
         # Error on bad path format
@@ -690,9 +711,9 @@ class TestInterfaceFunctions(
 
             with self.assertRaises(
                 ValueError,
-                msg="(row {})".format(
+                msg="(row {})".format(  # pylint: disable=consider-using-f-string
                     idx
-                ),  # pylint: disable=consider-using-f-string
+                ),
             ) as ctx:
                 _generate_and_write_ecdsa_keypair(**kwargs)
 
@@ -713,8 +734,11 @@ class TestInterfaceFunctions(
             ]
         ):
             with self.assertRaises(
-                FormatError, msg="(row {})".format(idx)
-            ):  # pylint: disable=consider-using-f-string
+                FormatError,
+                msg="(row {})".format(  # pylint: disable=consider-using-f-string
+                    idx
+                ),
+            ):
                 _generate_and_write_ecdsa_keypair(**kwargs)
 
         # TEST: Import errors
@@ -729,8 +753,11 @@ class TestInterfaceFunctions(
             ]
         ):
             with self.assertRaises(
-                Error, msg="(row {})".format(idx)
-            ) as ctx:  # pylint: disable=consider-using-f-string
+                Error,
+                msg="(row {})".format(  # pylint: disable=consider-using-f-string
+                    idx
+                ),
+            ) as ctx:
                 import_ecdsa_publickey_from_file(fn)
 
             self.assertTrue(
@@ -789,8 +816,11 @@ class TestInterfaceFunctions(
         ):
 
             with self.assertRaises(
-                err, msg="(row {})".format(idx)
-            ) as ctx:  # pylint: disable=consider-using-f-string
+                err,
+                msg="(row {})".format(  # pylint: disable=consider-using-f-string
+                    idx
+                ),
+            ) as ctx:
                 import_ecdsa_privatekey_from_file(*args, **kwargs)
 
             self.assertTrue(
@@ -809,9 +839,9 @@ class TestInterfaceFunctions(
 
         self.assertTrue(
             err_msg in str(ctx.exception),
-            "expected: '{}' got: '{}'".format(
+            "expected: '{}' got: '{}'".format(  # pylint: disable=consider-using-f-string
                 err_msg, ctx.exception
-            ),  # pylint: disable=consider-using-f-string
+            ),
         )
 
         # Error on bad path format
@@ -862,9 +892,11 @@ class TestInterfaceFunctions(
             ]
         ):
 
-            assert_msg = "(row {})".format(
-                idx
-            )  # pylint: disable=consider-using-f-string
+            assert_msg = (
+                "(row {})".format(  # pylint: disable=consider-using-f-string
+                    idx
+                )
+            )
             # Test generate_and_write_*_keypair creates an encrypted private key
             fn_encrypted = gen(key_pw)
             priv = import_priv(fn_encrypted, key_pw)
@@ -975,8 +1007,11 @@ class TestInterfaceFunctions(
                 path, key_type=key_type, password=pw
             )
             self.assertTrue(
-                key_schema.matches(key), "(row {})".format(idx)
-            )  # pylint: disable=consider-using-f-string
+                key_schema.matches(key),
+                "(row {})".format(  # pylint: disable=consider-using-f-string
+                    idx
+                ),
+            )
 
             # ... entered password on mock-prompt
             with mock.patch(
@@ -986,8 +1021,11 @@ class TestInterfaceFunctions(
                     path, key_type=key_type, prompt=True
                 )
             self.assertTrue(
-                key_schema.matches(key), "(row {})".format(idx)
-            )  # pylint: disable=consider-using-f-string
+                key_schema.matches(key),
+                "(row {})".format(  # pylint: disable=consider-using-f-string
+                    idx
+                ),
+            )
 
         # Error on wrong key for default key type
         with self.assertRaises(Error):

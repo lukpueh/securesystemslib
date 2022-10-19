@@ -43,9 +43,9 @@ class CommandError(Exception):
 
 class KeyExpirationError(Exception):  # pylint: disable=missing-class-docstring
     def __init__(self, key):
-        super(
+        super(  # pylint: disable=super-with-arguments
             KeyExpirationError, self
-        ).__init__()  # pylint: disable=super-with-arguments
+        ).__init__()
         self.key = key
 
     def __str__(self):

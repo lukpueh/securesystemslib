@@ -682,9 +682,9 @@ def _encode_canonical(
         raise exceptions.FormatError("I cannot encode " + repr(object))
 
 
-def encode_canonical(
-    object, output_function=None
-):  # pylint: disable=redefined-builtin,inconsistent-return-statements
+def encode_canonical(  # pylint: disable=inconsistent-return-statements
+    object, output_function=None  # pylint: disable=redefined-builtin
+):
     """
     <Purpose>
       Encode 'object' in canonical JSON form, as specified at

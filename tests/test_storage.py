@@ -31,9 +31,9 @@ class TestStorage(unittest.TestCase):  # pylint: disable=missing-class-docstring
         self.filepath = os.path.join(self.temp_dir, "testfile")
         with open(self.filepath, "wb") as test:
             test.write(b"testing")
-        self.fileobj = open(
+        self.fileobj = open(  # pylint: disable=consider-using-with
             self.filepath, "rb"
-        )  # pylint: disable=consider-using-with
+        )
 
     def tearDown(self):
         self.fileobj.close()

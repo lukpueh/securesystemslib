@@ -174,7 +174,7 @@ def run_duplicate_streams(cmd, timeout=_default_timeout()):
     stdout_fd, stdout_name = tempfile.mkstemp()
     stderr_fd, stderr_name = tempfile.mkstemp()
     try:
-        with io.open(
+        with io.open(  # pylint: disable=unspecified-encoding
             stdout_name, "r"
         ) as stdout_reader, os.fdopen(  # pylint: disable=unspecified-encoding
             stdout_fd, "w"

@@ -38,9 +38,11 @@ class Test_Process(unittest.TestCase):  # pylint: disable=invalid-name
         os.write(fd, b"use stdin kwarg")
         os.close(fd)
 
-        stdin_file = open(
-            path
-        )  # pylint: disable=unspecified-encoding,consider-using-with
+        stdin_file = (
+            open(  # pylint: disable=unspecified-encoding,consider-using-with
+                path
+            )
+        )
         cmd = (
             sys.executable
             + " -c \"import sys; assert(sys.stdin.read() == '{}')\""
@@ -75,13 +77,13 @@ class Test_Process(unittest.TestCase):  # pylint: disable=invalid-name
         # Create and open fake targets for standard streams
         stdout_fd, stdout_fn = tempfile.mkstemp()
         stderr_fd, stderr_fn = tempfile.mkstemp()
-        with io.open(
+        with io.open(  # pylint: disable=unspecified-encoding
             stdout_fn, "r"
         ) as fake_stdout_reader, os.fdopen(  # pylint: disable=unspecified-encoding
             stdout_fd, "w"
         ) as fake_stdout_writer, io.open(  # pylint: disable=unspecified-encoding
             stderr_fn, "r"
-        ) as fake_stderr_reader, os.fdopen(
+        ) as fake_stderr_reader, os.fdopen(  # pylint: disable=unspecified-encoding
             stderr_fd, "w"
         ) as fake_stderr_writer:
 
@@ -144,16 +146,16 @@ class Test_Process(unittest.TestCase):  # pylint: disable=invalid-name
         # Backup timeout and check that it is what's returned by _default_timeout()
         timeout_old = securesystemslib.settings.SUBPROCESS_TIMEOUT
         self.assertEqual(
-            securesystemslib.process._default_timeout(),
-            timeout_old,  # pylint: disable=protected-access
+            securesystemslib.process._default_timeout(),  # pylint: disable=protected-access
+            timeout_old,
         )
 
         # Modify timeout and check that _default_timeout() returns the same value
         timeout_new = timeout_old + 1
         securesystemslib.settings.SUBPROCESS_TIMEOUT = timeout_new
         self.assertEqual(
-            securesystemslib.process._default_timeout(),
-            timeout_new,  # pylint: disable=protected-access
+            securesystemslib.process._default_timeout(),  # pylint: disable=protected-access
+            timeout_new,
         )
 
         # Restore original timeout

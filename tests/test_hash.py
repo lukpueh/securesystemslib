@@ -32,8 +32,9 @@ logger = logging.getLogger(__name__)
 
 
 if (
-    not "hashlib" in securesystemslib.hash.SUPPORTED_LIBRARIES
-):  # pylint: disable=unneeded-not
+    not "hashlib"  # pylint: disable=unneeded-not
+    in securesystemslib.hash.SUPPORTED_LIBRARIES
+):
     logger.warning("Not testing hashlib: could not be imported.")
 
 

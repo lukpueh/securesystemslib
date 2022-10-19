@@ -1055,9 +1055,9 @@ def _decrypt(file_contents, password):
         )
 
     except ValueError:
-        raise exceptions.CryptoError(
+        raise exceptions.CryptoError(  # pylint: disable=raise-missing-from
             "Invalid encrypted file."
-        )  # pylint: disable=raise-missing-from
+        )
 
     # Ensure we have the expected raw data for the delimited cryptographic data.
     salt = binascii.unhexlify(salt.encode("utf-8"))
@@ -1070,12 +1070,10 @@ def _decrypt(file_contents, password):
     # Discard the old "salt" and "iterations" values, as we only need the old
     # derived key.
     (
-        junk_old_salt,
-        junk_old_iterations,
+        junk_old_salt,  # pylint: disable=unused-variable
+        junk_old_iterations,  # pylint: disable=unused-variable
         symmetric_key,
-    ) = _generate_derived_key(  # pylint: disable=unused-variable,unused-variable
-        password, salt, iterations
-    )
+    ) = _generate_derived_key(password, salt, iterations)
 
     # Verify the hmac to ensure the ciphertext is valid and has not been altered.
     # See the encryption routine for why we use the encrypt-then-MAC approach.

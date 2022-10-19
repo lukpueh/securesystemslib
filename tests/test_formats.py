@@ -220,10 +220,10 @@ class TestFormats(unittest.TestCase):  # pylint: disable=missing-class-docstring
 
         # Iterate 'valid_schemas', ensuring each 'valid_schema' correctly matches
         # its respective 'schema_type'.
-        for schema_name, (
+        for schema_name, (  # pylint: disable=unused-variable
             schema_type,
             valid_schema,
-        ) in valid_schemas.items():  # pylint: disable=unused-variable
+        ) in valid_schemas.items():
             if not schema_type.matches(valid_schema):
                 print("bad schema: " + repr(valid_schema))
 
@@ -241,9 +241,9 @@ class TestFormats(unittest.TestCase):  # pylint: disable=missing-class-docstring
 
     def test_unix_timestamp_to_datetime(self):
         # Test conditions for valid arguments.
-        UNIX_TIMESTAMP_SCHEMA = (
+        UNIX_TIMESTAMP_SCHEMA = (  # pylint: disable=invalid-name,unused-variable
             securesystemslib.formats.UNIX_TIMESTAMP_SCHEMA
-        )  # pylint: disable=invalid-name,unused-variable
+        )
         self.assertTrue(
             datetime.datetime,
             securesystemslib.formats.unix_timestamp_to_datetime(499137720),

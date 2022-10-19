@@ -597,9 +597,9 @@ class Integer(Schema):
         self._hi = hi
 
     def check_match(self, object):  # pylint: disable=redefined-builtin
-        if isinstance(object, bool) or not isinstance(
-            object, int
-        ):  # pylint: disable=no-else-raise
+        if isinstance(  # pylint: disable=no-else-raise
+            object, bool
+        ) or not isinstance(object, int):
             # We need to check for bool as a special case, since bool
             # is for historical reasons a subtype of int.
             raise exceptions.FormatError(
@@ -886,9 +886,9 @@ class Struct(Schema):
         self._struct_name = struct_name
 
     def check_match(self, object):  # pylint: disable=redefined-builtin
-        if not isinstance(
+        if not isinstance(  # pylint: disable=no-else-raise
             object, (list, tuple)
-        ):  # pylint: disable=no-else-raise
+        ):
             raise exceptions.FormatError(
                 "Expected "
                 + repr(self._struct_name)

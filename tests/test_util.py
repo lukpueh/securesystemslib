@@ -266,9 +266,11 @@ class TestUtil(
     def test_B8_load_json_file(self):
         data = ["a", {"b": ["c", None, 30.3, 29]}]
         filepath = self.make_temp_file()
-        fileobj = open(
-            filepath, "wt"
-        )  # pylint: disable=unspecified-encoding,consider-using-with
+        fileobj = (
+            open(  # pylint: disable=unspecified-encoding,consider-using-with
+                filepath, "wt"
+            )
+        )
         securesystemslib.util.json.dump(data, fileobj)
         fileobj.close()
         self.assertEqual(data, securesystemslib.util.load_json_file(filepath))
@@ -290,9 +292,11 @@ class TestUtil(
 
         # Invalid JSON content.
         filepath_bad_data = self.make_temp_file()
-        fileobj = open(
-            filepath_bad_data, "wt"
-        )  # pylint: disable=unspecified-encoding,consider-using-with
+        fileobj = (
+            open(  # pylint: disable=unspecified-encoding,consider-using-with
+                filepath_bad_data, "wt"
+            )
+        )
         fileobj.write("junk data")
         fileobj.close()
 
@@ -362,9 +366,9 @@ class TestUtil(
         self.assertTrue(
             securesystemslib.formats.PATH_SCHEMA.matches(random_path)
         )
-        self.assertTrue(
+        self.assertTrue(  # pylint: disable=redundant-unittest-assert
             10, len(random_path)
-        )  # pylint: disable=redundant-unittest-assert
+        )
 
     def test_digests_are_equal(self):
         digest = (

@@ -73,7 +73,7 @@ from securesystemslib.gpg.eddsa import (  # pylint: disable=wrong-import-positio
     ED25519_SIG_LENGTH,
 )
 from securesystemslib.gpg.eddsa import (
-    create_pubkey as eddsa_create_pubkey,  # pylint: disable=wrong-import-position,unused-import
+    create_pubkey as eddsa_create_pubkey,  # pylint: disable=wrong-import-position, unused-import
 )
 from securesystemslib.gpg.exceptions import (  # pylint: disable=wrong-import-position
     CommandError,
@@ -241,9 +241,11 @@ class TestCommon(unittest.TestCase):
         gpg_keyring_path = os.path.join(
             os.path.dirname(os.path.realpath(__file__)), "gpg_keyrings", "rsa"
         )
-        homearg = "--homedir {}".format(gpg_keyring_path).replace(
-            "\\", "/"
-        )  # pylint: disable=consider-using-f-string
+        homearg = (
+            "--homedir {}".format(  # pylint: disable=consider-using-f-string
+                gpg_keyring_path
+            ).replace("\\", "/")
+        )
 
         # Load test raw public key bundle from rsa keyring, used to construct
         # erroneous gpg data in tests below.
@@ -418,9 +420,9 @@ class TestCommon(unittest.TestCase):
                 msg = str(mock_log.info.call_args[0][0])
                 self.assertTrue(
                     expected_msg in msg,
-                    "'{}' not in '{}'".format(
+                    "'{}' not in '{}'".format(  # pylint: disable=consider-using-f-string
                         expected_msg, msg
-                    ),  # pylint: disable=consider-using-f-string
+                    ),
                 )
 
     def test_assign_certified_key_info_expiration(self):
@@ -531,9 +533,9 @@ class TestCommon(unittest.TestCase):
                 msg = str(mock_log.info.call_args[0][0])
                 self.assertTrue(
                     expected_msg in msg,
-                    "'{}' not in '{}'".format(
+                    "'{}' not in '{}'".format(  # pylint: disable=consider-using-f-string
                         expected_msg, msg
-                    ),  # pylint: disable=consider-using-f-string
+                    ),
                 )
 
     def test_get_verified_subkeys(self):
@@ -550,11 +552,9 @@ class TestCommon(unittest.TestCase):
 
         # Test subkey  without validity period, i.e. it does not expire
         self.assertTrue(
-            subkeys[
+            subkeys[  # pylint: disable=singleton-comparison
                 "70cfabf1e2f1dc60ac5c7bca10cd20d3d5bcb6ef"
-            ].get(  # pylint: disable=singleton-comparison
-                "validity_period"
-            )
+            ].get("validity_period")
             == None
         )
 
@@ -656,9 +656,11 @@ class TestGPGRSA(unittest.TestCase):
 
         # load the equivalent ssh key, and make sure that we get the same RSA key
         # parameters
-        ssh_key_basename = "{}.ssh".format(
-            self.default_keyid
-        )  # pylint: disable=consider-using-f-string
+        ssh_key_basename = (
+            "{}.ssh".format(  # pylint: disable=consider-using-f-string
+                self.default_keyid
+            )
+        )
         ssh_key_path = os.path.join(self.gnupg_home, ssh_key_basename)
         with open(ssh_key_path, "rb") as fp:
             keydata = fp.read()
@@ -755,9 +757,9 @@ class TestGPGRSA(unittest.TestCase):
         expected = "returned non-zero exit status '2'"
         self.assertTrue(
             expected in str(ctx.exception),
-            "{} not in {}".format(
+            "{} not in {}".format(  # pylint: disable=consider-using-f-string
                 expected, ctx.exception
-            ),  # pylint: disable=consider-using-f-string
+            ),
         )
 
     def test_verify_signature_with_expired_key(self):
@@ -780,10 +782,10 @@ class TestGPGRSA(unittest.TestCase):
         )
         self.assertTrue(
             expected == str(ctx.exception),
-            "\nexpected: {}"
-            "\ngot:      {}".format(
+            "\nexpected: {}"  # pylint: disable=consider-using-f-string
+            "\ngot:      {}".format(  # pylint: disable=consider-using-f-string
                 expected, ctx.exception
-            ),  # pylint: disable=consider-using-f-string
+            ),
         )
 
 
@@ -829,9 +831,11 @@ class TestGPGDSA(unittest.TestCase):
         our_exported_key = dsa_create_pubkey(key_data)
 
         # load same key, pre-exported with 3rd-party tooling
-        pem_key_basename = "{}.pem".format(
-            self.default_keyid
-        )  # pylint: disable=consider-using-f-string
+        pem_key_basename = (
+            "{}.pem".format(  # pylint: disable=consider-using-f-string
+                self.default_keyid
+            )
+        )
         pem_key_path = os.path.join(self.gnupg_home, pem_key_basename)
         with open(pem_key_path, "rb") as fp:
             keydata = fp.read()

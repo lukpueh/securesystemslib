@@ -79,9 +79,9 @@ class TestKeys(unittest.TestCase):  # pylint: disable=missing-class-docstring
         )
 
     def test_generate_ecdsa_key(self):
-        _ecdsakey_dict = (
+        _ecdsakey_dict = (  # pylint: disable=invalid-name
             KEYS.generate_ecdsa_key()
-        )  # pylint: disable=invalid-name
+        )
 
         # Check if the format of the object returned by generate_ecdsa_key()
         # corresponds to ECDSAKEY_SCHEMA format.
@@ -212,10 +212,8 @@ class TestKeys(unittest.TestCase):  # pylint: disable=missing-class-docstring
         # Call format_metadata_to_key by using the default value for keyid_hash_algorithms
         (
             rsakey_dict_from_meta_default,
-            junk,
-        ) = KEYS.format_metadata_to_key(  # pylint: disable=unused-variable
-            test_rsakey_dict
-        )
+            junk,  # pylint: disable=unused-variable
+        ) = KEYS.format_metadata_to_key(test_rsakey_dict)
 
         # Check if the format of the object returned by calling this function with
         # default hash algorithms e.g. securesystemslib.settings.HASH_ALGORITHMS corresponds
@@ -296,9 +294,9 @@ class TestKeys(unittest.TestCase):  # pylint: disable=missing-class-docstring
             FORMAT_ERROR_MSG,
         )
 
-        keyid = KEYS._get_keyid(
+        keyid = KEYS._get_keyid(  # pylint: disable=protected-access
             keytype, scheme, keyvalue
-        )  # pylint: disable=protected-access
+        )
 
         # Check format of 'keyid' - the output of '_get_keyid()' function.
         self.assertEqual(
@@ -433,9 +431,9 @@ class TestKeys(unittest.TestCase):  # pylint: disable=missing-class-docstring
 
         # Modifying 'DATA'.
         _DATA_STR = "1111" + DATA_STR + "1111"  # pylint: disable=invalid-name
-        _DATA = securesystemslib.formats.encode_canonical(
+        _DATA = securesystemslib.formats.encode_canonical(  # pylint: disable=invalid-name
             _DATA_STR
-        ).encode(  # pylint: disable=invalid-name
+        ).encode(
             "utf-8"
         )
 
@@ -485,12 +483,12 @@ class TestKeys(unittest.TestCase):  # pylint: disable=missing-class-docstring
 
         # Verify that the pure python 'ed25519' base case (triggered if 'pynacl'
         # is unavailable) is executed in securesystemslib.keys.verify_signature().
-        KEYS._ED25519_CRYPTO_LIBRARY = (
-            "invalid"  # pylint: disable=protected-access
-        )
-        KEYS._available_crypto_libraries = [
+        KEYS._ED25519_CRYPTO_LIBRARY = (  # pylint: disable=protected-access
             "invalid"
-        ]  # pylint: disable=protected-access
+        )
+        KEYS._available_crypto_libraries = [  # pylint: disable=protected-access
+            "invalid"
+        ]
         verified = KEYS.verify_signature(
             self.ed25519key_dict, ed25519_signature, DATA
         )
@@ -550,9 +548,9 @@ class TestKeys(unittest.TestCase):  # pylint: disable=missing-class-docstring
         # Try to import an rsakey from a valid PEM.
         private_pem = self.rsakey_dict["keyval"]["private"]
 
-        private_rsakey = KEYS.import_rsakey_from_private_pem(
+        private_rsakey = KEYS.import_rsakey_from_private_pem(  # pylint: disable=unused-variable
             private_pem
-        )  # pylint: disable=unused-variable
+        )
 
         # Test for invalid arguments.
         self.assertRaises(
@@ -678,9 +676,9 @@ class TestKeys(unittest.TestCase):  # pylint: disable=missing-class-docstring
     def test_import_ecdsakey_from_private_pem(self):
         # Try to import an ecdsakey from a valid PEM.
         private_pem = self.ecdsakey_dict["keyval"]["private"]
-        ecdsakey = KEYS.import_ecdsakey_from_private_pem(
+        ecdsakey = KEYS.import_ecdsakey_from_private_pem(  # pylint: disable=unused-variable
             private_pem
-        )  # pylint: disable=unused-variable
+        )
 
         # Test for an encrypted PEM.
         scheme = "ecdsa-sha2-nistp256"

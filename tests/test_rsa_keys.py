@@ -407,8 +407,8 @@ class TestRSA_keys(
 
         # Test for invalid encrypted content (i.e., invalid hmac and ciphertext.)
         encryption_delimiter = (
-            securesystemslib.rsa_keys._ENCRYPTION_DELIMITER
-        )  # pylint: disable=protected-access
+            securesystemslib.rsa_keys._ENCRYPTION_DELIMITER  # pylint: disable=protected-access
+        )
         salt, iterations, hmac, iv, ciphertext = encrypted_rsa_key.split(
             encryption_delimiter
         )

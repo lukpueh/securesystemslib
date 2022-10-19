@@ -647,9 +647,9 @@ def get_pubkey_bundle(data, keyid):
 
     else:
         raise KeyNotFoundError(
-            "Could not find gpg key '{}' in exported key data.".format(
+            "Could not find gpg key '{}' in exported key data.".format(  # pylint: disable=consider-using-f-string
                 keyid
-            )  # pylint: disable=consider-using-f-string
+            )
         )
 
     # Add subkeys dictionary to master pubkey "subkeys" field if subkeys exist
