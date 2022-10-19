@@ -71,17 +71,15 @@ try:
 except ImportError:
     NACL = False
 
-from securesystemslib import (  # pylint: disable=wrong-import-position
-    exceptions,
-    formats,
-)
+# pylint: disable=wrong-import-position
+from securesystemslib import exceptions, formats
 
 # The optimized pure Python implementation of Ed25519.  If
 # PyNaCl cannot be imported and an attempt to use is made in this module, a
 # 'securesystemslib.exceptions.UnsupportedLibraryError' exception is raised.
-from securesystemslib._vendor.ed25519 import (
-    ed25519 as python_ed25519,  # pylint: disable=wrong-import-position
-)
+from securesystemslib._vendor.ed25519 import ed25519 as python_ed25519
+
+# pylint: enable=wrong-import-position
 
 # Supported ed25519 signing schemes: 'ed25519'.  The pure Python implementation
 # (i.e., ed25519') and PyNaCl (i.e., 'nacl', libsodium + Python bindings)

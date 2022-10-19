@@ -444,8 +444,8 @@ class TestSchema(unittest.TestCase):  # pylint: disable=missing-class-docstring
 
         self.assertTrue(re_schema_optional.matches("abc"))
         self.assertTrue(
-            re_schema_optional._re_name
-            == "pattern"  # pylint: disable=protected-access
+            re_schema_optional._re_name  # pylint: disable=protected-access
+            == "pattern"
         )
 
         # Test conditions for invalid arguments.

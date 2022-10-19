@@ -32,22 +32,17 @@ if sys.version_info >= (3, 3):
 else:
     from mock import patch  # pylint: disable=import-error
 
-from collections import OrderedDict  # pylint: disable=wrong-import-position
-from copy import deepcopy  # pylint: disable=wrong-import-position
+# pylint: disable=wrong-import-position
+from collections import OrderedDict
+from copy import deepcopy
 
-import cryptography.hazmat.backends as backends  # pylint: disable=consider-using-from-import,wrong-import-position
-import cryptography.hazmat.primitives.hashes as hashing  # pylint: disable=wrong-import-position
-import cryptography.hazmat.primitives.serialization as serialization  # pylint: disable=consider-using-from-import,wrong-import-position
+import cryptography.hazmat.backends as backends  # pylint: disable=consider-using-from-import
+import cryptography.hazmat.primitives.hashes as hashing
+import cryptography.hazmat.primitives.serialization as serialization  # pylint: disable=consider-using-from-import
 
-from securesystemslib import (  # pylint: disable=wrong-import-position
-    exceptions,
-    process,
-)
-from securesystemslib.formats import (  # pylint: disable=wrong-import-position
-    ANY_PUBKEY_DICT_SCHEMA,
-    GPG_PUBKEY_SCHEMA,
-)
-from securesystemslib.gpg.common import (  # pylint: disable=wrong-import-position
+from securesystemslib import exceptions, process
+from securesystemslib.formats import ANY_PUBKEY_DICT_SCHEMA, GPG_PUBKEY_SCHEMA
+from securesystemslib.gpg.common import (
     _assign_certified_key_info,
     _get_verified_subkeys,
     get_pubkey_bundle,
@@ -55,7 +50,7 @@ from securesystemslib.gpg.common import (  # pylint: disable=wrong-import-positi
     parse_pubkey_payload,
     parse_signature_packet,
 )
-from securesystemslib.gpg.constants import (  # pylint: disable=wrong-import-position
+from securesystemslib.gpg.constants import (
     GPG_EXPORT_PUBKEY_COMMAND,
     HAVE_GPG,
     PACKET_TYPE_PRIMARY_KEY,
@@ -66,16 +61,14 @@ from securesystemslib.gpg.constants import (  # pylint: disable=wrong-import-pos
     SHA256,
     SHA512,
 )
-from securesystemslib.gpg.dsa import (
-    create_pubkey as dsa_create_pubkey,  # pylint: disable=wrong-import-position
-)
-from securesystemslib.gpg.eddsa import (  # pylint: disable=wrong-import-position
-    ED25519_SIG_LENGTH,
-)
-from securesystemslib.gpg.eddsa import (
-    create_pubkey as eddsa_create_pubkey,  # pylint: disable=wrong-import-position, unused-import
-)
-from securesystemslib.gpg.exceptions import (  # pylint: disable=wrong-import-position
+from securesystemslib.gpg.dsa import create_pubkey as dsa_create_pubkey
+
+# pylint: disable=unused-import
+from securesystemslib.gpg.eddsa import ED25519_SIG_LENGTH
+from securesystemslib.gpg.eddsa import create_pubkey as eddsa_create_pubkey
+
+# pylint: enable=unused-import
+from securesystemslib.gpg.exceptions import (
     CommandError,
     KeyExpirationError,
     KeyNotFoundError,
@@ -83,16 +76,14 @@ from securesystemslib.gpg.exceptions import (  # pylint: disable=wrong-import-po
     PacketVersionNotSupportedError,
     SignatureAlgorithmNotSupportedError,
 )
-from securesystemslib.gpg.functions import (  # pylint: disable=wrong-import-position
+from securesystemslib.gpg.functions import (
     create_signature,
     export_pubkey,
     export_pubkeys,
     verify_signature,
 )
-from securesystemslib.gpg.rsa import (
-    create_pubkey as rsa_create_pubkey,  # pylint: disable=wrong-import-position
-)
-from securesystemslib.gpg.util import (  # pylint: disable=wrong-import-position
+from securesystemslib.gpg.rsa import create_pubkey as rsa_create_pubkey
+from securesystemslib.gpg.util import (
     Version,
     get_hashing_class,
     get_version,
@@ -100,6 +91,8 @@ from securesystemslib.gpg.util import (  # pylint: disable=wrong-import-position
     parse_packet_header,
     parse_subpacket_header,
 )
+
+# pylint: enable=wrong-import-position
 
 
 class GPGTestUtils:

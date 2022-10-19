@@ -26,16 +26,12 @@ try:
 except ImportError:
     CRYPTO = False
 
-from securesystemslib import (  # pylint: disable=wrong-import-position
-    exceptions,
-    formats,
-)
-from securesystemslib.gpg import (
-    util as gpg_util,  # pylint: disable=wrong-import-position
-)
-from securesystemslib.gpg.exceptions import (  # pylint: disable=wrong-import-position
-    PacketParsingError,
-)
+# pylint: disable=wrong-import-position
+from securesystemslib import exceptions, formats
+from securesystemslib.gpg import util as gpg_util
+from securesystemslib.gpg.exceptions import PacketParsingError
+
+# pylint: enable=wrong-import-position
 
 
 def create_pubkey(pubkey_info):
