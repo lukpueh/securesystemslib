@@ -380,6 +380,7 @@ def get_version() -> Version:
         stdout=process.PIPE,
         stderr=process.PIPE,
         universal_newlines=True,
+        timeout=constants.GPG_TIMEOUT,
     )
 
     full_version_info = gpg_process.stdout
