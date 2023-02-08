@@ -42,7 +42,7 @@ log = logging.getLogger(__name__)
 NO_CRYPTO_MSG = "GPG support requires the cryptography library"
 
 
-def create_signature(content, keyid=None, homedir=None):
+def create_signature(content, keyid=None, homedir=None, timeout=GPG_TIMEOUT):
     """
     <Purpose>
       Calls the gpg command line utility to sign the passed content with the key
@@ -129,7 +129,7 @@ def create_signature(content, keyid=None, homedir=None):
         check=False,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        timeout=GPG_TIMEOUT,
+        timeout=timeout,
     )
 
     # TODO: It's suggested to take a look at `--status-fd` for proper error
@@ -264,7 +264,7 @@ def verify_signature(signature_object, pubkey_info, content):
     )
 
 
-def export_pubkey(keyid, homedir=None):
+def export_pubkey(keyid, homedir=None, timeout=GPG_TIMEOUT):
     """Exports a public key from a GnuPG keyring.
 
     Arguments:
@@ -314,7 +314,7 @@ def export_pubkey(keyid, homedir=None):
         command,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        timeout=GPG_TIMEOUT,
+        timeout=timeout,
     )
 
     key_packet = gpg_process.stdout
