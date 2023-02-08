@@ -19,6 +19,7 @@ import dataclasses
 import logging
 import re
 import struct
+import subprocess  # nosec
 
 CRYPTO = True
 NO_CRYPTO_MSG = "gpg.utils requires the cryptography library"
@@ -29,7 +30,7 @@ except ImportError:
     CRYPTO = False
 
 # pylint: disable=wrong-import-position
-from securesystemslib import exceptions, process
+from securesystemslib import exceptions
 from securesystemslib.gpg import constants
 from securesystemslib.gpg.exceptions import PacketParsingError
 
@@ -375,10 +376,10 @@ def get_version() -> Version:
         raise exceptions.UnsupportedLibraryError(constants.NO_GPG_MSG)
 
     command = constants.gpg_version_command()
-    gpg_process = process.run(
+    gpg_process = subprocess.run(
         command,
-        stdout=process.PIPE,
-        stderr=process.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         universal_newlines=True,
         timeout=constants.GPG_TIMEOUT,
     )
