@@ -24,7 +24,7 @@ from securesystemslib import process
 
 log = logging.getLogger(__name__)
 
-GPG_TIMEOUT = 3
+GPG_TIMEOUT = 10
 
 
 @functools.lru_cache(maxsize=3)
