@@ -34,7 +34,6 @@ from securesystemslib.gpg.functions import (
     export_pubkeys,
     verify_signature,
 )
-
 from securesystemslib.signer import GPGKey, GPGSigner, Signer
 
 
@@ -154,7 +153,7 @@ class TestPublicInterfacesGPG(
         for key, sig in key_signature_pairs:
             self.assertTrue(verify_signature(sig, key, data))
             # pylint: disable=protected-access
-            GPGKey._from_legacy_dict(key).verify_signature(
+            GPGSigner._key_from_legacy_dict(key).verify_signature(
                 GPGSigner._sig_from_legacy_dict(sig), data
             )
 
