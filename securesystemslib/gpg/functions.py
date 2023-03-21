@@ -101,6 +101,7 @@ def create_signature(content, keyid=None, homedir=None, timeout=GPG_TIMEOUT):
       securesystemslib.formats.GPG_SIGNATURE_SCHEMA.
 
     """
+    print("sign", timeout)
     if not have_gpg():  # pragma: no cover
         raise exceptions.UnsupportedLibraryError(NO_GPG_MSG)
 
@@ -287,6 +288,8 @@ def export_pubkey(keyid, homedir=None, timeout=GPG_TIMEOUT):
       An OpenPGP public key object in GPG_PUBKEY_SCHEMA format.
 
     """
+    print("export", timeout)
+
     if not have_gpg():  # pragma: no cover
         raise exceptions.UnsupportedLibraryError(NO_GPG_MSG)
 

@@ -30,6 +30,7 @@ GPG_TIMEOUT = 10
 @functools.lru_cache(maxsize=3)
 def is_available_gnupg(gnupg: str, timeout=GPG_TIMEOUT) -> bool:
     """Returns whether gnupg points to a gpg binary."""
+    print("available", timeout)
     gpg_version_cmd = shlex.split(f"{gnupg} --version")
     try:
         subprocess.run(  # nosec
