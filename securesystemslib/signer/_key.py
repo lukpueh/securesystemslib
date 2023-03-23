@@ -1,11 +1,37 @@
 """Key interface and the default implementations"""
 import logging
 from abc import ABCMeta, abstractmethod
-from typing import Any, Dict, Optional, Tuple, Type
+from typing import Any, Dict, Optional, Tuple, Type, Union
 
-import securesystemslib.keys as sslib_keys
 from securesystemslib import exceptions
 from securesystemslib.signer._signature import Signature
+
+CRYPTO_IMPORT_ERROR = None
+try:
+    from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
+    from cryptography.hazmat.primitives.asymmetric.ec import (
+        ECDSA,
+        EllipticCurvePublicKey,
+    )
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+        Ed25519PublicKey,
+    )
+    from cryptography.hazmat.primitives.asymmetric.padding import (
+        MGF1,
+        PSS,
+        PKCS1v15,
+    )
+    from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
+    from cryptography.hazmat.primitives.hashes import (
+        SHA224,
+        SHA256,
+        SHA384,
+        SHA512,
+    )
+    from cryptography.hazmat.primitives.serialization import load_pem_public_key
+except ImportError:
+    CRYPTO_IMPORT_ERROR = "'pyca/cryptography' library required"
+
 
 logger = logging.getLogger(__name__)
 
@@ -180,20 +206,72 @@ class SSlibKey(Key):
     def to_dict(self) -> Dict[str, Any]:
         return self._to_dict()
 
+    def _load_key(
+        self,
+    ) -> Union["RSAPublicKey", "Ed25519PublicKey", "EllipticCurvePublicKey"]:
+        """Load public key instance based on keytype."""
+        if self.keytype in [
+            "rsa",
+            "ecdsa",
+            "ecdsa-sha2-nistp256",
+            "ecdsa-sha2-nistp384",
+        ]:
+            public_bytes = self.keyval["public"].encode("utf-8")
+            return load_pem_public_key(public_bytes)
+
+        if self.keytype == "ed25519":
+            public_bytes = bytes.fromhex(self.keyval["public"])
+            return Ed25519PublicKey.from_public_bytes(public_bytes)
+
+        raise ValueError(f"unknown keytype '{self.keytype}'")
+
+    def _load_args(self) -> Tuple[Any]:
+        """Get additional verification args for certain schemes (not all)."""
+        verify_args = {
+            "rsassa-pss-sha224": (
+                PSS(mgf=MGF1(SHA224()), salt_length=PSS.AUTO),
+                SHA224(),
+            ),
+            "rsassa-pss-sha256": (
+                PSS(mgf=MGF1(SHA256()), salt_length=PSS.AUTO),
+                SHA256(),
+            ),
+            "rsassa-pss-sha384": (
+                PSS(mgf=MGF1(SHA384()), salt_length=PSS.AUTO),
+                SHA384(),
+            ),
+            "rsassa-pss-sha512": (
+                PSS(mgf=MGF1(SHA512()), salt_length=PSS.AUTO),
+                SHA512(),
+            ),
+            "rsa-pkcs1v15-sha224": (PKCS1v15(), SHA224()),
+            "rsa-pkcs1v15-sha256": (PKCS1v15(), SHA256()),
+            "rsa-pkcs1v15-sha384": (PKCS1v15(), SHA384()),
+            "rsa-pkcs1v15-sha512": (PKCS1v15(), SHA512()),
+            "ecdsa-sha2-nistp256": (ECDSA(SHA256()),),
+            "ecdsa-sha2-nistp384": (ECDSA(SHA384()),),
+        }
+        return verify_args.get(self.scheme, ())
+
     def verify_signature(self, signature: Signature, data: bytes) -> None:
         try:
-            if not sslib_keys.verify_signature(
-                self.to_securesystemslib_key(),
-                signature.to_dict(),
-                data,
-            ):
-                raise exceptions.UnverifiedSignatureError(
-                    f"Failed to verify signature by {self.keyid}"
-                )
+            if CRYPTO_IMPORT_ERROR:
+                raise exceptions.UnsupportedLibraryError(CRYPTO_IMPORT_ERROR)
+
+            key = self._load_key()
+            args = self._load_args()
+
+            sig_bytes = bytes.fromhex(signature.signature)
+            key.verify(sig_bytes, data, *args)
+
+        except InvalidSignature as e:
+            raise exceptions.UnverifiedSignatureError(
+                f"Failed to verify signature by {self.keyid}"
+            ) from e
         except (
-            exceptions.CryptoError,
-            exceptions.FormatError,
-            exceptions.UnsupportedAlgorithmError,
+            ValueError,
+            UnsupportedAlgorithm,
+            KeyError,
             exceptions.UnsupportedLibraryError,
         ) as e:
             logger.info("Key %s failed to verify sig: %s", self.keyid, str(e))
