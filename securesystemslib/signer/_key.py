@@ -1,11 +1,46 @@
 """Key interface and the default implementations"""
 import logging
 from abc import ABCMeta, abstractmethod
-from typing import Any, Dict, Optional, Tuple, Type
+from typing import Any, Dict, Optional, Tuple, Type, cast
 
-import securesystemslib.keys as sslib_keys
 from securesystemslib import exceptions
+from securesystemslib._vendor.ed25519.ed25519 import (
+    SignatureMismatch,
+    checkvalid,
+)
 from securesystemslib.signer._signature import Signature
+
+CRYPTO_IMPORT_ERROR = None
+try:
+    from cryptography.exceptions import InvalidSignature
+    from cryptography.hazmat.primitives.asymmetric.ec import (
+        ECDSA,
+        EllipticCurvePublicKey,
+    )
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+        Ed25519PublicKey,
+    )
+    from cryptography.hazmat.primitives.asymmetric.padding import (
+        MGF1,
+        PSS,
+        PKCS1v15,
+    )
+    from cryptography.hazmat.primitives.asymmetric.rsa import (
+        AsymmetricPadding,
+        RSAPublicKey,
+    )
+    from cryptography.hazmat.primitives.asymmetric.types import PublicKeyTypes
+    from cryptography.hazmat.primitives.hashes import (
+        SHA224,
+        SHA256,
+        SHA384,
+        SHA512,
+        HashAlgorithm,
+    )
+    from cryptography.hazmat.primitives.serialization import load_pem_public_key
+except ImportError:
+    CRYPTO_IMPORT_ERROR = "'pyca/cryptography' library required"
+
 
 logger = logging.getLogger(__name__)
 
@@ -180,22 +215,80 @@ class SSlibKey(Key):
     def to_dict(self) -> Dict[str, Any]:
         return self._to_dict()
 
+    def _from_pem(self) -> "PublicKeyTypes":
+        """Helper to load public key instance from PEM-formatted keyval."""
+        public_bytes = self.keyval["public"].encode("utf-8")
+        return load_pem_public_key(public_bytes)
+
+    @staticmethod
+    def _hash_algo(name) -> Type["HashAlgorithm"]:
+        """Helper to return hash algorithm class for name."""
+        algos = {
+            "sha224": SHA224,
+            "sha256": SHA256,
+            "sha384": SHA384,
+            "sha512": SHA512,
+        }
+        return algos[name]
+
     def verify_signature(self, signature: Signature, data: bytes) -> None:
         try:
-            if not sslib_keys.verify_signature(
-                self.to_securesystemslib_key(),
-                signature.to_dict(),
-                data,
+            sig = bytes.fromhex(signature.signature)
+
+            if CRYPTO_IMPORT_ERROR:
+                if self.scheme == "ed25519":
+                    # Verify using vendored ed25519 implementation
+                    pub = bytes.fromhex(self.keyval["public"])
+                    checkvalid(sig, data, pub)
+                    return
+
+                raise exceptions.UnsupportedLibraryError(CRYPTO_IMPORT_ERROR)
+
+            key: PublicKeyTypes
+            if self.scheme in [
+                "rsassa-pss-sha224",
+                "rsassa-pss-sha256",
+                "rsassa-pss-sha384",
+                "rsassa-pss-sha512",
+                "rsa-pkcs1v15-sha224",
+                "rsa-pkcs1v15-sha256",
+                "rsa-pkcs1v15-sha384",
+                "rsa-pkcs1v15-sha512",
+            ]:
+                key = cast(RSAPublicKey, self._from_pem())
+                padding_name, algo_name = self.scheme.split("-")[1:]
+                algo = self._hash_algo(algo_name)()
+                padding: AsymmetricPadding
+                if padding_name == "pss":
+                    padding = PSS(mgf=MGF1(algo), salt_length=PSS.AUTO)
+                else:
+                    padding = PKCS1v15()
+                key.verify(sig, data, padding, algo)
+
+            elif self.scheme in ["ecdsa-sha2-nistp256", "ecdsa-sha2-nistp384"]:
+                key = cast(EllipticCurvePublicKey, self._from_pem())
+                algo_name = f"sha{self.scheme[-3:]}"
+                algo = self._hash_algo(algo_name)()
+                key.verify(sig, data, ECDSA(algo))
+
+            elif self.scheme in ["ed25519"]:
+                public_bytes = bytes.fromhex(self.keyval["public"])
+                key = Ed25519PublicKey.from_public_bytes(public_bytes)
+                key.verify(sig, data)
+
+            else:
+                raise ValueError(f"unknown scheme '{self.scheme}'")
+
+        # Workaround for 'except (SignatureMismatch, InvalidSignature)' to
+        # conditionally evaluate the optional 'InvalidSignature':
+        except Exception as e:
+            if isinstance(e, SignatureMismatch) or (
+                not CRYPTO_IMPORT_ERROR and isinstance(e, InvalidSignature)
             ):
                 raise exceptions.UnverifiedSignatureError(
                     f"Failed to verify signature by {self.keyid}"
-                )
-        except (
-            exceptions.CryptoError,
-            exceptions.FormatError,
-            exceptions.UnsupportedAlgorithmError,
-            exceptions.UnsupportedLibraryError,
-        ) as e:
+                ) from e
+
             logger.info("Key %s failed to verify sig: %s", self.keyid, str(e))
             raise exceptions.VerificationError(
                 f"Unknown failure to verify signature by {self.keyid}"
