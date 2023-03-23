@@ -1,6 +1,7 @@
 """Key interface and the default implementations"""
 import logging
 from abc import ABCMeta, abstractmethod
+from binascii import unhexlify
 from typing import Any, Dict, Optional, Tuple, Type
 
 import securesystemslib.keys as sslib_keys
@@ -176,6 +177,82 @@ class SSlibKey(Key):
             exceptions.FormatError,
             exceptions.UnsupportedAlgorithmError,
         ) as e:
+            logger.info("Key %s failed to verify sig: %s", self.keyid, str(e))
+            raise exceptions.VerificationError(
+                f"Unknown failure to verify signature by {self.keyid}"
+            ) from e
+
+
+from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
+from cryptography.hazmat.primitives.asymmetric.padding import (
+    MGF1,
+    PSS,
+    AsymmetricPadding,
+    PKCS1v15,
+)
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
+from cryptography.hazmat.primitives.hashes import (
+    SHA224,
+    SHA256,
+    SHA384,
+    SHA512,
+    HashAlgorithm,
+)
+from cryptography.hazmat.primitives.serialization import load_pem_public_key
+
+
+class SSlibRSAKey(SSlibKey):
+    @staticmethod
+    def _get_hash_algorithm_and_padding(
+        scheme: str,
+    ) -> Tuple[AsymmetricPadding, HashAlgorithm]:
+        # TODO: Don't hardcode scheme strings all over the place + DRY!
+        hash_algorithm_and_padding = {
+            "rsassa-pss-sha224": (
+                SHA224(),
+                PSS(mgf=MGF1(SHA224()), salt_length=PSS.AUTO),
+            ),
+            "rsassa-pss-sha256": (
+                SHA256(),
+                PSS(mgf=MGF1(SHA256()), salt_length=PSS.AUTO),
+            ),
+            "rsassa-pss-sha384": (
+                SHA384(),
+                PSS(mgf=MGF1(SHA384()), salt_length=PSS.AUTO),
+            ),
+            "rsassa-pss-sha512": (
+                SHA512(),
+                PSS(mgf=MGF1(SHA512()), salt_length=PSS.AUTO),
+            ),
+            "rsa-pkcs1v15-sha224": (SHA224(), PKCS1v15()),
+            "rsa-pkcs1v15-sha256": (SHA256(), PKCS1v15()),
+            "rsa-pkcs1v15-sha384": (SHA384(), PKCS1v15()),
+            "rsa-pkcs1v15-sha512": (SHA512(), PKCS1v15()),
+        }
+        return hash_algorithm_and_padding[scheme]
+
+    def verify_signature(self, signature: Signature, data: bytes) -> None:
+        try:
+            key: RSAPublicKey = load_pem_public_key(
+                self.keyval["public"].encode("utf-8")
+            )
+            algorithm, padding = self._get_hash_algorithm_and_padding(
+                self.scheme
+            )
+
+            key.verify(
+                unhexlify(signature.signature),
+                data,
+                padding,
+                algorithm,
+            )
+
+        except InvalidSignature as e:
+            raise exceptions.UnverifiedSignatureError(
+                f"Failed to verify signature by {self.keyid}"
+            ) from e
+
+        except (ValueError, UnsupportedAlgorithm, KeyError):
             logger.info("Key %s failed to verify sig: %s", self.keyid, str(e))
             raise exceptions.VerificationError(
                 f"Unknown failure to verify signature by {self.keyid}"

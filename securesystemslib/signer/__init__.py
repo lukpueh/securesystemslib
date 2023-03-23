@@ -7,7 +7,12 @@ Some implementations are provided by default but more can be added by users.
 from securesystemslib.signer._gcp_signer import GCPSigner
 from securesystemslib.signer._gpg_signer import GPGKey, GPGSigner
 from securesystemslib.signer._hsm_signer import HSMSigner
-from securesystemslib.signer._key import KEY_FOR_TYPE_AND_SCHEME, Key, SSlibKey
+from securesystemslib.signer._key import (
+    KEY_FOR_TYPE_AND_SCHEME,
+    Key,
+    SSlibKey,
+    SSlibRSAKey,
+)
 from securesystemslib.signer._signature import Signature
 from securesystemslib.signer._signer import (
     SIGNER_FOR_URI_SCHEME,
@@ -36,18 +41,14 @@ KEY_FOR_TYPE_AND_SCHEME.update(
         ("ecdsa-sha2-nistp256", "ecdsa-sha2-nistp256"): SSlibKey,
         ("ecdsa-sha2-nistp384", "ecdsa-sha2-nistp384"): SSlibKey,
         ("ed25519", "ed25519"): SSlibKey,
-        ("rsa", "rsassa-pss-md5"): SSlibKey,
-        ("rsa", "rsassa-pss-sha1"): SSlibKey,
-        ("rsa", "rsassa-pss-sha224"): SSlibKey,
-        ("rsa", "rsassa-pss-sha256"): SSlibKey,
-        ("rsa", "rsassa-pss-sha384"): SSlibKey,
-        ("rsa", "rsassa-pss-sha512"): SSlibKey,
-        ("rsa", "rsa-pkcs1v15-md5"): SSlibKey,
-        ("rsa", "rsa-pkcs1v15-sha1"): SSlibKey,
-        ("rsa", "rsa-pkcs1v15-sha224"): SSlibKey,
-        ("rsa", "rsa-pkcs1v15-sha256"): SSlibKey,
-        ("rsa", "rsa-pkcs1v15-sha384"): SSlibKey,
-        ("rsa", "rsa-pkcs1v15-sha512"): SSlibKey,
+        ("rsa", "rsassa-pss-sha224"): SSlibRSAKey,
+        ("rsa", "rsassa-pss-sha256"): SSlibRSAKey,
+        ("rsa", "rsassa-pss-sha384"): SSlibRSAKey,
+        ("rsa", "rsassa-pss-sha512"): SSlibRSAKey,
+        ("rsa", "rsa-pkcs1v15-sha224"): SSlibRSAKey,
+        ("rsa", "rsa-pkcs1v15-sha256"): SSlibRSAKey,
+        ("rsa", "rsa-pkcs1v15-sha384"): SSlibRSAKey,
+        ("rsa", "rsa-pkcs1v15-sha512"): SSlibRSAKey,
         ("sphincs", "sphincs-shake-128s"): SSlibKey,
         ("rsa", "pgp+rsa-pkcsv1.5"): GPGKey,
         ("dsa", "pgp+dsa-fips-180-2"): GPGKey,
