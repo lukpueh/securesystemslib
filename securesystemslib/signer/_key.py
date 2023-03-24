@@ -283,3 +283,39 @@ class SSlibEd25519Key(SSlibKey):
             raise exceptions.VerificationError(
                 f"Unknown failure to verify signature by {self.keyid}"
             ) from e
+
+
+from cryptography.hazmat.primitives.asymmetric.ec import (
+    ECDSA,
+    EllipticCurvePublicKey,
+    EllipticCurveSignatureAlgorithm,
+)
+
+
+class SSlibECDSAKey(SSlibKey):
+    @staticmethod
+    def _get_signature_algorithm(scheme) -> EllipticCurveSignatureAlgorithm:
+        signature_algorithm = {
+            "ecdsa-sha2-nistp256": ECDSA(SHA256()),
+            "ecdsa-sha2-nistp384": ECDSA(SHA384()),
+        }
+        return signature_algorithm[scheme]
+
+    def verify_signature(self, signature: Signature, data: bytes) -> None:
+        try:
+            key: EllipticCurvePublicKey = load_pem_public_key(
+                self.keyval["public"].encode("utf-8")
+            )
+            sig_algorithm = self._get_signature_algorithm(self.scheme)
+            key.verify(unhexlify(signature.signature), data, sig_algorithm)
+
+        except InvalidSignature as e:
+            raise exceptions.UnverifiedSignatureError(
+                f"Failed to verify signature by {self.keyid}"
+            ) from e
+
+        except (ValueError, UnsupportedAlgorithm, KeyError()):
+            logger.info("Key %s failed to verify sig: %s", self.keyid, str(e))
+            raise exceptions.VerificationError(
+                f"Unknown failure to verify signature by {self.keyid}"
+            ) from e
