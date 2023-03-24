@@ -10,6 +10,7 @@ from securesystemslib.signer._hsm_signer import HSMSigner
 from securesystemslib.signer._key import (
     KEY_FOR_TYPE_AND_SCHEME,
     Key,
+    SSlibEd25519Key,
     SSlibKey,
     SSlibRSAKey,
 )
@@ -40,7 +41,7 @@ KEY_FOR_TYPE_AND_SCHEME.update(
         ("ecdsa", "ecdsa-sha2-nistp384"): SSlibKey,
         ("ecdsa-sha2-nistp256", "ecdsa-sha2-nistp256"): SSlibKey,
         ("ecdsa-sha2-nistp384", "ecdsa-sha2-nistp384"): SSlibKey,
-        ("ed25519", "ed25519"): SSlibKey,
+        ("ed25519", "ed25519"): SSlibEd25519Key,
         ("rsa", "rsassa-pss-sha224"): SSlibRSAKey,
         ("rsa", "rsassa-pss-sha256"): SSlibRSAKey,
         ("rsa", "rsassa-pss-sha384"): SSlibRSAKey,

@@ -257,3 +257,29 @@ class SSlibRSAKey(SSlibKey):
             raise exceptions.VerificationError(
                 f"Unknown failure to verify signature by {self.keyid}"
             ) from e
+
+
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+
+
+class SSlibEd25519Key(SSlibKey):
+    def verify_signature(self, signature: Signature, data: bytes) -> None:
+        try:
+            public_bytes = unhexlify(self.keyval["public"])
+            key = Ed25519PublicKey.from_public_bytes(public_bytes)
+
+            key.verify(
+                unhexlify(signature.signature),
+                data,
+            )
+
+        except InvalidSignature as e:
+            raise exceptions.UnverifiedSignatureError(
+                f"Failed to verify signature by {self.keyid}"
+            ) from e
+
+        except (ValueError, UnsupportedAlgorithm):
+            logger.info("Key %s failed to verify sig: %s", self.keyid, str(e))
+            raise exceptions.VerificationError(
+                f"Unknown failure to verify signature by {self.keyid}"
+            ) from e
