@@ -191,7 +191,10 @@ class SSlibKey(Key):
     def _load_key(
         self,
     ) -> Union[RSAPublicKey, Ed25519PublicKey, EllipticCurvePublicKey]:
-        """Helper to load public key instance based on keytype."""
+        """Helper to load public key instance based on keytype.
+
+        NOTE: raises ValueError, if self.keytype is not recognized.
+        """
         if self.keytype in [
             "rsa",
             "ecdsa",
@@ -209,9 +212,10 @@ class SSlibKey(Key):
             raise ValueError(f"unknown keytype '{self.keytype}'")
 
     def _load_args(self) -> Tuple[Any]:
-        """Helper to get additional verification arguments based on scheme."""
-        # TODO: Don't hardcode scheme strings all over the place + DRY!
-        # TODO: Is using *args too weakly typed?
+        """Helper to get additional verification arguments based on scheme.
+
+        NOTE: returns empty tuple, if scheme is not recognized.
+        """
         verify_args = {
             "rsassa-pss-sha224": (
                 PSS(mgf=MGF1(SHA224()), salt_length=PSS.AUTO),
