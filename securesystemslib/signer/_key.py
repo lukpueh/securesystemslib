@@ -1,7 +1,6 @@
 """Key interface and the default implementations"""
 import logging
 from abc import ABCMeta, abstractmethod
-from binascii import unhexlify
 from typing import Any, Dict, Optional, Tuple, Type, Union
 
 from securesystemslib import exceptions
@@ -209,7 +208,7 @@ class SSlibKey(Key):
             return load_pem_public_key(public_bytes)
 
         elif self.keytype == "ed25519":
-            public_bytes = unhexlify(self.keyval["public"])
+            public_bytes = bytes.fromhex(self.keyval["public"])
             return Ed25519PublicKey.from_public_bytes(public_bytes)
 
         else:
@@ -248,12 +247,12 @@ class SSlibKey(Key):
 
     def verify_signature(self, signature: Signature, data: bytes) -> None:
         try:
-            sig = unhexlify(signature.signature)
+            sig = bytes.fromhex(signature.signature)
 
             if CRYPTO_IMPORT_ERROR:
                 if self.keytype == "ed25519":
                     # Verify using vendored ed25519 implementation
-                    pub = unhexlify(self.keyval["public"])
+                    pub = bytes.fromhex(self.keyval["public"])
                     return checkvalid(sig, data, pub)
 
                 raise exceptions.UnsupportedLibraryError(CRYPTO_IMPORT_ERROR)
