@@ -28,6 +28,8 @@ from securesystemslib.signer import (
     SecretsHandler,
     Signature,
     Signer,
+    SpxKey,
+    SpxSigner,
     SSlibKey,
     SSlibSigner,
 )
@@ -282,8 +284,6 @@ class TestSigner(unittest.TestCase):
             KEYS.generate_ed25519_key(),
             KEYS.generate_ecdsa_key(),
         ]
-        if os.name != "nt":
-            cls.keys.append(KEYS.generate_sphincs_key())
 
         cls.DATA = b"DATA"
 
@@ -618,6 +618,19 @@ class TestGPGRSA(unittest.TestCase):
             "aa", "rsa", "rsassa-pss-sha256", {"public": "val"}
         )
         self.assertNotEqual(key1, other_key)
+
+
+@unittest.skipIf(os.name == "nt", "PySPX n/a on Windows")
+class TestSphincs(unittest.TestCase):
+    """Test create keys, sign and verify for sphincs keys."""
+
+    def test_sphincs(self):
+        """sphincs signer smoketest."""
+        signer = SpxSigner.new_()
+        sig = signer.sign(b"data")
+        self.assertIsNone(signer.public_key.verify_signature(sig, b"data"))
+        with self.assertRaises(UnverifiedSignatureError):
+            signer.public_key.verify_signature(sig, b"not data")
 
 
 # Run the unit tests.

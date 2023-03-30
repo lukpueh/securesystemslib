@@ -35,27 +35,6 @@ DATA_STR = "SOME DATA REQUIRING AUTHENTICITY."
 DATA = securesystemslib.formats.encode_canonical(DATA_STR).encode("utf-8")
 
 
-@unittest.skipIf(os.name == "nt", "PySPX n/a on Windows")
-class TestSphincsKeys(unittest.TestCase):
-    """Test create keys, sign and verify for sphincs keys."""
-
-    def test_sphincs_keys(self):
-        key = KEYS.generate_sphincs_key()
-        sig = KEYS.create_signature(key, b"data")
-        self.assertTrue(securesystemslib.formats.SIGNATURE_SCHEMA.matches(sig))
-
-        # Assert valid/invalid signature
-        self.assertTrue(KEYS.verify_signature(key, sig, b"data"))
-        self.assertFalse(KEYS.verify_signature(key, sig, b"not data"))
-
-        # Assert verificaiton failure for unsupported signing scheme
-        key["scheme"] = "invalid_scheme"
-        with self.assertRaises(
-            securesystemslib.exceptions.UnsupportedAlgorithmError
-        ):
-            KEYS.verify_signature(key, sig, b"data")
-
-
 class TestKeys(unittest.TestCase):  # pylint: disable=missing-class-docstring
     @classmethod
     def setUpClass(cls):
