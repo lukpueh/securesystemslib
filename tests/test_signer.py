@@ -382,13 +382,11 @@ class TestSigner(unittest.TestCase):
         for scheme_dict in self.keys:
             # Test generation of signatures.
             sslib_signer = SSlibSigner(scheme_dict)
+            public_key = SSlibKey.from_securesystemslib_key(scheme_dict)
             sig_obj = sslib_signer.sign(self.DATA)
 
             # Verify signature
-            verified = KEYS.verify_signature(
-                scheme_dict, sig_obj.to_dict(), self.DATA
-            )
-            self.assertTrue(verified, "Incorrect signature.")
+            self.assertIsNone(public_key.verify_signature(sig_obj, self.DATA))
 
             # Removing private key from "scheme_dict".
             private = scheme_dict["keyval"]["private"]
