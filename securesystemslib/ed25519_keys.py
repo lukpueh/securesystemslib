@@ -37,8 +37,8 @@
   http://nacl.cr.yp.to/
   https://github.com/pyca/ed25519
 
-  The ed25519-related functions included here are generate(), create_signature()
-  and verify_signature().  The 'ed25519' and PyNaCl (i.e., 'nacl') modules used
+  The ed25519-related functions included here are generate() and create_signature().
+  The 'ed25519' and PyNaCl (i.e., 'nacl') modules used
   by ed25519_keys.py perform the actual ed25519 computations and the functions
   listed above can be viewed as an easy-to-use public interface.
  """
@@ -67,17 +67,12 @@ try:
     # avoid conflicts with own exceptions of same name
     from nacl import exceptions as nacl_exceptions
     from nacl.encoding import RawEncoder
-    from nacl.signing import SigningKey, VerifyKey
+    from nacl.signing import SigningKey
 except ImportError:
     NACL = False
 
 # pylint: disable=wrong-import-position
 from securesystemslib import exceptions, formats
-
-# The optimized pure Python implementation of Ed25519.  If
-# PyNaCl cannot be imported and an attempt to use is made in this module, a
-# 'securesystemslib.exceptions.UnsupportedLibraryError' exception is raised.
-from securesystemslib._vendor.ed25519 import ed25519 as python_ed25519
 
 # pylint: enable=wrong-import-position
 
@@ -246,112 +241,6 @@ def create_signature(public_key, private_key, data, scheme):
         )
 
     return signature, scheme
-
-
-def verify_signature(public_key, scheme, signature, data):
-    """
-  <Purpose>
-    Determine whether the private key corresponding to 'public_key' produced
-    'signature'.  verify_signature() will use the public key, the 'scheme' and
-    'sig', and 'data' arguments to complete the verification.
-
-    >>> public, private = generate_public_and_private()
-    >>> data = b'The quick brown fox jumps over the lazy dog'
-    >>> scheme = 'ed25519'
-    >>> signature, scheme = \
-        create_signature(public, private, data, scheme)
-    >>> verify_signature(public, scheme, signature, data)
-    True
-    >>> bad_data = b'The sly brown fox jumps over the lazy dog'
-    >>> bad_signature, scheme = \
-        create_signature(public, private, bad_data, scheme)
-    >>> verify_signature(public, scheme, bad_signature, data)
-    False
-
-  <Arguments>
-    public_key:
-      The public key is a 32-byte string.
-
-    scheme:
-      'ed25519' signature scheme used by either the pure python
-      implementation (i.e., ed25519.py) or PyNacl (i.e., 'nacl').
-
-    signature:
-      The signature is a 64-byte string.
-
-    data:
-      Data object used by securesystemslib.ed25519_keys.create_signature() to
-      generate 'signature'.  'data' is needed here to verify the signature.
-
-  <Exceptions>
-    securesystemslib.exceptions.UnsupportedAlgorithmError.  Raised if the
-    signature scheme 'scheme' is not one supported by
-    securesystemslib.ed25519_keys.create_signature().
-
-    securesystemslib.exceptions.FormatError. Raised if the arguments are
-    improperly formatted.
-
-  <Side Effects>
-    nacl.signing.VerifyKey.verify() called if available, otherwise
-    securesystemslib._vendor.ed25519.ed25519.checkvalid() called to do the
-    verification.
-
-  <Returns>
-    Boolean.  True if the signature is valid, False otherwise.
-  """
-
-    # Does 'public_key' have the correct format?
-    # This check will ensure 'public_key' conforms to
-    # 'securesystemslib.formats.ED25519PUBLIC_SCHEMA', which must have length 32
-    # bytes.  Raise 'securesystemslib.exceptions.FormatError' if the check fails.
-    formats.ED25519PUBLIC_SCHEMA.check_match(public_key)
-
-    # Is 'scheme' properly formatted?
-    formats.ED25519_SIG_SCHEMA.check_match(scheme)
-
-    # Is 'signature' properly formatted?
-    formats.ED25519SIGNATURE_SCHEMA.check_match(signature)
-
-    # Verify 'signature'.  Before returning the Boolean result, ensure 'ed25519'
-    # was used as the signature scheme.
-    public = public_key
-    valid_signature = False
-
-    if scheme in _SUPPORTED_ED25519_SIGNING_SCHEMES:
-        if NACL:
-            try:
-                nacl_verify_key = VerifyKey(public)
-                nacl_verify_key.verify(data, signature)
-                valid_signature = True
-
-            except nacl_exceptions.BadSignatureError:
-                pass
-
-        # Verify 'ed25519' signature with the pure Python implementation.
-        else:
-            try:
-                python_ed25519.checkvalid(signature, data, public)
-                valid_signature = True
-
-            # The pure Python implementation raises 'Exception' if 'signature' is
-            # invalid.
-            except Exception:  # pylint: disable=broad-except  # nosec
-                pass
-
-    # This is a defensive check for a valid 'scheme', which should have already
-    # been validated in the ED25519_SIG_SCHEMA.check_match(scheme) above.
-    else:  # pragma: no cover
-        message = (
-            "Unsupported ed25519 signature scheme: "
-            + repr(scheme)
-            + ".\n"
-            + "Supported schemes: "
-            + repr(_SUPPORTED_ED25519_SIGNING_SCHEMES)
-            + "."
-        )
-        raise exceptions.UnsupportedAlgorithmError(message)
-
-    return valid_signature
 
 
 if __name__ == "__main__":

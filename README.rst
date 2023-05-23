@@ -181,29 +181,6 @@ cryptographic operations.
     >>> signature = create_signature(ecdsa_key, data)
 
 
-Verify ECDSA, Ed25519, and RSA Signatures
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-::
-
-    # Continuing from the previous sections . . .
-
-    >>> data = b'The quick brown fox jumps over the lazy dog'
-    >>> ed25519_key = generate_ed25519_key()
-    >>> signature = create_signature(ed25519_key, data)
-    >>> verify_signature(ed25519_key, signature, data)
-    True
-    >>> verify_signature(ed25519_key, signature, 'bad_data')
-    False
-    >>> rsa_key = generate_rsa_key()
-    >>> signature = create_signature(rsa_key, data)
-    >>> verify_signature(rsa_key, signature, data)
-    True
-    >>> ecdsa_key = generate_ecdsa_key()
-    >>> signature = create_signature(ecdsa_key, data)
-    >>> verify_signature(ecdsa_key, signature, data)
-    True
-
 
 Miscellaneous functions
 ~~~~~~~~~~~~~~~~~~~~~~~

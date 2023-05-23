@@ -15,7 +15,6 @@
   Test cases for test_ed25519_keys.py.
 """
 
-import os
 import unittest
 
 import securesystemslib.ed25519_keys
@@ -92,106 +91,6 @@ class TestEd25519_keys(
             private,
             123,
             scheme,
-        )
-
-    def test_verify_signature(self):
-        global public  # pylint: disable=global-variable-not-assigned
-        global private  # pylint: disable=global-variable-not-assigned
-        data = b"The quick brown fox jumps over the lazy dog"
-        scheme = "ed25519"
-        signature, scheme = securesystemslib.ed25519_keys.create_signature(
-            public, private, data, scheme
-        )
-
-        valid_signature = securesystemslib.ed25519_keys.verify_signature(
-            public, scheme, signature, data
-        )
-        self.assertEqual(True, valid_signature)
-
-        bad_signature = os.urandom(64)
-        valid_signature = securesystemslib.ed25519_keys.verify_signature(
-            public, scheme, bad_signature, data
-        )
-        self.assertEqual(False, valid_signature)
-
-        # Check for improperly formatted arguments.
-        self.assertRaises(
-            securesystemslib.exceptions.FormatError,
-            securesystemslib.ed25519_keys.verify_signature,
-            123,
-            scheme,
-            signature,
-            data,
-        )
-
-        # Signature method improperly formatted.
-        self.assertRaises(
-            securesystemslib.exceptions.FormatError,
-            securesystemslib.ed25519_keys.verify_signature,
-            public,
-            123,
-            signature,
-            data,
-        )
-
-        # Invalid signature method.
-        self.assertRaises(
-            securesystemslib.exceptions.FormatError,
-            securesystemslib.ed25519_keys.verify_signature,
-            public,
-            "unsupported_scheme",
-            signature,
-            data,
-        )
-
-        # Signature not a string.
-        self.assertRaises(
-            securesystemslib.exceptions.FormatError,
-            securesystemslib.ed25519_keys.verify_signature,
-            public,
-            scheme,
-            123,
-            data,
-        )
-
-        # Invalid signature length, which must be exactly 64 bytes..
-        self.assertRaises(
-            securesystemslib.exceptions.FormatError,
-            securesystemslib.ed25519_keys.verify_signature,
-            public,
-            scheme,
-            "bad_signature",
-            data,
-        )
-
-        # Check for invalid signature and data.
-        # Mismatched data.
-        self.assertEqual(
-            False,
-            securesystemslib.ed25519_keys.verify_signature(
-                public, scheme, signature, b"123"
-            ),
-        )
-
-        # Mismatched signature.
-        bad_signature = b"a" * 64
-        self.assertEqual(
-            False,
-            securesystemslib.ed25519_keys.verify_signature(
-                public, scheme, bad_signature, data
-            ),
-        )
-
-        # Generated signature created with different data.
-        new_signature, scheme = securesystemslib.ed25519_keys.create_signature(
-            public, private, b"mismatched data", scheme
-        )
-
-        self.assertEqual(
-            False,
-            securesystemslib.ed25519_keys.verify_signature(
-                public, scheme, new_signature, data
-            ),
         )
 
 
