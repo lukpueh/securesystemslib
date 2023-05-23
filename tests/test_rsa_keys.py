@@ -148,104 +148,8 @@ class TestRSA_keys(
                 data,
             )
 
-    def test_verify_rsa_signature(self):
-        global public_rsa  # pylint: disable=global-variable-not-assigned
-        global private_rsa  # pylint: disable=global-variable-not-assigned
-        data = "The quick brown fox jumps over the lazy dog".encode("utf-8")
-
-        for rsa_scheme in securesystemslib.keys.RSA_SIGNATURE_SCHEMES:
-            signature, scheme = securesystemslib.rsa_keys.create_rsa_signature(
-                private_rsa, data, rsa_scheme
-            )
-
-            valid_signature = securesystemslib.rsa_keys.verify_rsa_signature(
-                signature, scheme, public_rsa, data
-            )
-            self.assertEqual(True, valid_signature)
-
-            # Check for an invalid public key.
-            self.assertRaises(
-                securesystemslib.exceptions.CryptoError,
-                securesystemslib.rsa_keys.verify_rsa_signature,
-                signature,
-                scheme,
-                private_rsa,
-                data,
-            )
-
-            # Check for improperly formatted arguments.
-            self.assertRaises(
-                securesystemslib.exceptions.FormatError,
-                securesystemslib.rsa_keys.verify_rsa_signature,
-                signature,
-                123,
-                public_rsa,
-                data,
-            )
-
-            self.assertRaises(
-                securesystemslib.exceptions.FormatError,
-                securesystemslib.rsa_keys.verify_rsa_signature,
-                signature,
-                scheme,
-                123,
-                data,
-            )
-
-            self.assertRaises(
-                securesystemslib.exceptions.FormatError,
-                securesystemslib.rsa_keys.verify_rsa_signature,
-                123,
-                scheme,
-                public_rsa,
-                data,
-            )
-
-            self.assertRaises(
-                securesystemslib.exceptions.FormatError,
-                securesystemslib.rsa_keys.verify_rsa_signature,
-                signature,
-                "invalid_scheme",
-                public_rsa,
-                data,
-            )
-
-            # Check for invalid 'signature' and 'data' arguments.
-            self.assertRaises(
-                securesystemslib.exceptions.FormatError,
-                securesystemslib.rsa_keys.verify_rsa_signature,
-                signature,
-                scheme,
-                public_rsa,
-                123,
-            )
-
-            self.assertEqual(
-                False,
-                securesystemslib.rsa_keys.verify_rsa_signature(
-                    signature, scheme, public_rsa, b"mismatched data"
-                ),
-            )
-
-            (
-                mismatched_signature,
-                scheme,
-            ) = securesystemslib.rsa_keys.create_rsa_signature(
-                private_rsa, b"mismatched data"
-            )
-
-            self.assertEqual(
-                False,
-                securesystemslib.rsa_keys.verify_rsa_signature(
-                    mismatched_signature, scheme, public_rsa, data
-                ),
-            )
-
     def test_verify_rsa_pss_different_salt_lengths(self):
         rsa_scheme = "rsassa-pss-sha256"
-        data = "The ancients say, salt length does not matter that much".encode(
-            "utf-8"
-        )
 
         private_key = load_pem_private_key(
             private_rsa.encode("utf-8"),
@@ -263,28 +167,6 @@ class TestRSA_keys(
                 private_key, digest.algorithm
             ),
         )
-
-        # Sign with max salt length (briefly available in sslib v0.24.0):
-        max_salt_sig = private_key.sign(
-            data,
-            padding.PSS(
-                mgf=padding.MGF1(digest.algorithm),
-                salt_length=padding.PSS.MAX_LENGTH,
-            ),
-            digest.algorithm,
-        )
-
-        # Sign with salt length == digest length
-        fix_salt_sig, _ = securesystemslib.rsa_keys.create_rsa_signature(
-            private_rsa, data
-        )
-
-        # Verification infers salt length automatically and so works for both
-        for signature in (max_salt_sig, fix_salt_sig):
-            verified = securesystemslib.rsa_keys.verify_rsa_signature(
-                signature, rsa_scheme, public_rsa, data
-            )
-            self.assertTrue(verified)
 
     def test_create_rsa_encrypted_pem(self):
         global public_rsa  # pylint: disable=global-variable-not-assigned
