@@ -1,7 +1,7 @@
 """Key interface and the default implementations"""
 import logging
 from abc import ABCMeta, abstractmethod
-from typing import Any, Dict, Optional, Tuple, Type, Union
+from typing import Any, Dict, Optional, Tuple, Type, cast
 
 from securesystemslib import exceptions
 from securesystemslib._vendor.ed25519.ed25519 import (
@@ -25,14 +25,20 @@ try:
         PSS,
         PKCS1v15,
     )
-    from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
+    from cryptography.hazmat.primitives.asymmetric.rsa import (
+        AsymmetricPadding,
+        RSAPublicKey,
+    )
+    from cryptography.hazmat.primitives.asymmetric.types import PublicKeyTypes
     from cryptography.hazmat.primitives.hashes import (
         SHA224,
         SHA256,
         SHA384,
         SHA512,
+        HashAlgorithm,
     )
     from cryptography.hazmat.primitives.serialization import load_pem_public_key
+
 except ImportError:
     CRYPTO_IMPORT_ERROR = "'pyca/cryptography' library required"
 
@@ -210,59 +216,26 @@ class SSlibKey(Key):
     def to_dict(self) -> Dict[str, Any]:
         return self._to_dict()
 
-    def _load_key(
-        self,
-    ) -> Union["RSAPublicKey", "Ed25519PublicKey", "EllipticCurvePublicKey"]:
-        """Load public key instance based on keytype."""
-        if self.keytype in [
-            "rsa",
-            "ecdsa",
-            "ecdsa-sha2-nistp256",
-            "ecdsa-sha2-nistp384",
-        ]:
-            public_bytes = self.keyval["public"].encode("utf-8")
-            return load_pem_public_key(public_bytes)
+    def _from_pem(self) -> "PublicKeyTypes":
+        public_bytes = self.keyval["public"].encode("utf-8")
+        return load_pem_public_key(public_bytes)
 
-        if self.keytype == "ed25519":
-            public_bytes = bytes.fromhex(self.keyval["public"])
-            return Ed25519PublicKey.from_public_bytes(public_bytes)
-
-        raise ValueError(f"unknown keytype '{self.keytype}'")
-
-    def _load_args(self) -> Tuple[Any]:
-        """Get additional verification args for certain schemes (not all)."""
-        verify_args = {
-            "rsassa-pss-sha224": (
-                PSS(mgf=MGF1(SHA224()), salt_length=PSS.AUTO),
-                SHA224(),
-            ),
-            "rsassa-pss-sha256": (
-                PSS(mgf=MGF1(SHA256()), salt_length=PSS.AUTO),
-                SHA256(),
-            ),
-            "rsassa-pss-sha384": (
-                PSS(mgf=MGF1(SHA384()), salt_length=PSS.AUTO),
-                SHA384(),
-            ),
-            "rsassa-pss-sha512": (
-                PSS(mgf=MGF1(SHA512()), salt_length=PSS.AUTO),
-                SHA512(),
-            ),
-            "rsa-pkcs1v15-sha224": (PKCS1v15(), SHA224()),
-            "rsa-pkcs1v15-sha256": (PKCS1v15(), SHA256()),
-            "rsa-pkcs1v15-sha384": (PKCS1v15(), SHA384()),
-            "rsa-pkcs1v15-sha512": (PKCS1v15(), SHA512()),
-            "ecdsa-sha2-nistp256": (ECDSA(SHA256()),),
-            "ecdsa-sha2-nistp384": (ECDSA(SHA384()),),
+    @staticmethod
+    def _hash_algo(name) -> Type["HashAlgorithm"]:
+        algos = {
+            "sha224": SHA224,
+            "sha256": SHA256,
+            "sha384": SHA384,
+            "sha512": SHA512,
         }
-        return verify_args.get(self.scheme, ())
+        return algos[name]
 
     def verify_signature(self, signature: Signature, data: bytes) -> None:
         try:
             sig = bytes.fromhex(signature.signature)
 
             if CRYPTO_IMPORT_ERROR:
-                if self.keytype == "ed25519":
+                if self.scheme == "ed25519":
                     # Verify using vendored ed25519 implementation
                     pub = bytes.fromhex(self.keyval["public"])
                     checkvalid(sig, data, pub)
@@ -270,10 +243,40 @@ class SSlibKey(Key):
 
                 raise exceptions.UnsupportedLibraryError(CRYPTO_IMPORT_ERROR)
 
-            # Verify using pyca/cryptography
-            key = self._load_key()
-            args = self._load_args()
-            key.verify(sig, data, *args)
+            key: PublicKeyTypes
+            if self.scheme in [
+                "rsassa-pss-sha224",
+                "rsassa-pss-sha256",
+                "rsassa-pss-sha384",
+                "rsassa-pss-sha512",
+                "rsa-pkcs1v15-sha224",
+                "rsa-pkcs1v15-sha256",
+                "rsa-pkcs1v15-sha384",
+                "rsa-pkcs1v15-sha512",
+            ]:
+                key = cast(RSAPublicKey, self._from_pem())
+                padding_name, algo_name = self.scheme.split("-")[1:]
+                algo = self._hash_algo(algo_name)()
+                padding: AsymmetricPadding
+                if padding_name == "pss":
+                    padding = PSS(mgf=MGF1(algo), salt_length=PSS.AUTO)
+                else:
+                    padding = PKCS1v15()
+                key.verify(sig, data, padding, algo)
+
+            elif self.scheme in ["ecdsa-sha2-nistp256", "ecdsa-sha2-nistp384"]:
+                key = cast(EllipticCurvePublicKey, self._from_pem())
+                algo_name = f"sha{self.scheme[-3:]}"
+                algo = self._hash_algo(algo_name)()
+                key.verify(sig, data, ECDSA(algo))
+
+            elif self.scheme in ["ed25519"]:
+                public_bytes = bytes.fromhex(self.keyval["public"])
+                key = Ed25519PublicKey.from_public_bytes(public_bytes)
+                key.verify(sig, data)
+
+            else:
+                raise ValueError(f"unknown scheme '{self.scheme}'")
 
         # Workaround for 'except (SignatureMismatch, InvalidSignature)' to
         # conditionally evaluate the optional 'InvalidSignature':
