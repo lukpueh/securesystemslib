@@ -26,6 +26,7 @@ try:
         PKCS1v15,
     )
     from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
+    from cryptography.hazmat.primitives.asymmetric.types import PublicKeyTypes
     from cryptography.hazmat.primitives.hashes import (
         SHA224,
         SHA256,
@@ -212,7 +213,7 @@ class SSlibKey(Key):
 
     def _load_key(
         self,
-    ) -> Union["RSAPublicKey", "Ed25519PublicKey", "EllipticCurvePublicKey"]:
+    ) -> PublicKeyTypes:
         """Load public key instance based on keytype."""
         if self.keytype in [
             "rsa",
@@ -229,33 +230,9 @@ class SSlibKey(Key):
 
         raise ValueError(f"unknown keytype '{self.keytype}'")
 
-    def _load_args(self) -> Tuple[Any]:
-        """Get additional verification args for certain schemes (not all)."""
-        verify_args = {
-            "rsassa-pss-sha224": (
-                PSS(mgf=MGF1(SHA224()), salt_length=PSS.AUTO),
-                SHA224(),
-            ),
-            "rsassa-pss-sha256": (
-                PSS(mgf=MGF1(SHA256()), salt_length=PSS.AUTO),
-                SHA256(),
-            ),
-            "rsassa-pss-sha384": (
-                PSS(mgf=MGF1(SHA384()), salt_length=PSS.AUTO),
-                SHA384(),
-            ),
-            "rsassa-pss-sha512": (
-                PSS(mgf=MGF1(SHA512()), salt_length=PSS.AUTO),
-                SHA512(),
-            ),
-            "rsa-pkcs1v15-sha224": (PKCS1v15(), SHA224()),
-            "rsa-pkcs1v15-sha256": (PKCS1v15(), SHA256()),
-            "rsa-pkcs1v15-sha384": (PKCS1v15(), SHA384()),
-            "rsa-pkcs1v15-sha512": (PKCS1v15(), SHA512()),
-            "ecdsa-sha2-nistp256": (ECDSA(SHA256()),),
-            "ecdsa-sha2-nistp384": (ECDSA(SHA384()),),
-        }
-        return verify_args.get(self.scheme, ())
+    # def _from_pem(self) -> "PublicKeyTypes":
+    #     public_bytes = self.keyval["public"].encode("utf-8")
+    #     return load_pem_public_key(public_bytes)
 
     def verify_signature(self, signature: Signature, data: bytes) -> None:
         try:
@@ -272,8 +249,50 @@ class SSlibKey(Key):
 
             # Verify using pyca/cryptography
             key = self._load_key()
-            args = self._load_args()
-            key.verify(sig, data, *args)
+            if self.scheme == "rsassa-pss-sha224":
+                key.verify(
+                    sig,
+                    data,
+                    PSS(mgf=MGF1(SHA224()), salt_length=PSS.AUTO),
+                    SHA224(),
+                )
+            elif self.scheme == "rsassa-pss-sha256":
+                key.verify(
+                    sig,
+                    data,
+                    PSS(mgf=MGF1(SHA256()), salt_length=PSS.AUTO),
+                    SHA256(),
+                )
+            elif self.scheme == "rsassa-pss-sha384":
+                key.verify(
+                    sig,
+                    data,
+                    PSS(mgf=MGF1(SHA384()), salt_length=PSS.AUTO),
+                    SHA384(),
+                )
+            elif self.scheme == "rsassa-pss-sha512":
+                key.verify(
+                    sig,
+                    data,
+                    PSS(mgf=MGF1(SHA512()), salt_length=PSS.AUTO),
+                    SHA512(),
+                )
+            elif self.scheme == "rsa-pkcs1v15-sha224":
+                key.verify(sig, data, PKCS1v15(), SHA224())
+            elif self.scheme == "rsa-pkcs1v15-sha256":
+                key.verify(sig, data, PKCS1v15(), SHA256())
+            elif self.scheme == "rsa-pkcs1v15-sha384":
+                key.verify(sig, data, PKCS1v15(), SHA384())
+            elif self.scheme == "rsa-pkcs1v15-sha512":
+                key.verify(sig, data, PKCS1v15(), SHA512())
+            elif self.scheme == "ecdsa-sha2-nistp256":
+                key.verify(sig, data, ECDSA(SHA256()))
+            elif self.scheme == "ecdsa-sha2-nistp384":
+                key.verify(sig, data, ECDSA(SHA384()))
+            elif self.scheme == "ed25519":
+                key.verify(sig, data)
+            else:
+                raise ValueError(f"unknown scheme '{self.scheme}'")
 
         # Workaround for 'except (SignatureMismatch, InvalidSignature)' to
         # conditionally evaluate the optional 'InvalidSignature':
