@@ -11,7 +11,6 @@ import securesystemslib.keys as KEYS
 from securesystemslib.exceptions import (
     CryptoError,
     FormatError,
-    UnsupportedAlgorithmError,
     UnverifiedSignatureError,
     VerificationError,
 )
@@ -403,7 +402,7 @@ class TestSigner(unittest.TestCase):
             scheme_dict["scheme"] = "invalid_scheme"
             sslib_signer = SSlibSigner(scheme_dict)
 
-            with self.assertRaises((UnsupportedAlgorithmError, FormatError)):
+            with self.assertRaises(ValueError):
                 sslib_signer.sign(self.DATA)
 
             scheme_dict["scheme"] = valid_scheme

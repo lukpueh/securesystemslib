@@ -20,9 +20,11 @@ try:
     from cryptography.exceptions import InvalidSignature
     from cryptography.hazmat.primitives.asymmetric.ec import (
         ECDSA,
+        EllipticCurvePrivateKey,
         EllipticCurvePublicKey,
     )
     from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+        Ed25519PrivateKey,
         Ed25519PublicKey,
     )
     from cryptography.hazmat.primitives.asymmetric.padding import (
@@ -32,9 +34,13 @@ try:
     )
     from cryptography.hazmat.primitives.asymmetric.rsa import (
         AsymmetricPadding,
+        RSAPrivateKey,
         RSAPublicKey,
     )
-    from cryptography.hazmat.primitives.asymmetric.types import PublicKeyTypes
+    from cryptography.hazmat.primitives.asymmetric.types import (
+        PrivateKeyTypes,
+        PublicKeyTypes,
+    )
     from cryptography.hazmat.primitives.hashes import (
         SHA224,
         SHA256,
@@ -42,7 +48,10 @@ try:
         SHA512,
         HashAlgorithm,
     )
-    from cryptography.hazmat.primitives.serialization import load_pem_public_key
+    from cryptography.hazmat.primitives.serialization import (
+        load_pem_private_key,
+        load_pem_public_key,
+    )
 except ImportError:
     CRYPTO_IMPORT_ERROR = "'pyca/cryptography' library required"
 
@@ -246,16 +255,65 @@ class SSlibSigner(Signer):
         keydict["keyval"]["private"] = private
         return cls(keydict)
 
+    def _from_pem(self) -> "PrivateKeyTypes":
+        """Helper to load public key instance from PEM-formatted keyval."""
+        private_bytes = self.key_dict["keyval"]["private"].encode("utf-8")
+        return load_pem_private_key(private_bytes, password=None)
+
+    @staticmethod
+    def _hash_algo(name) -> Type["HashAlgorithm"]:
+        """Helper to return hash algorithm class for name."""
+        algos = {
+            "sha224": SHA224,
+            "sha256": SHA256,
+            "sha384": SHA384,
+            "sha512": SHA512,
+        }
+        return algos[name]
+
     def sign(self, payload: bytes) -> Signature:
         """Signs a given payload by the key assigned to the SSlibSigner instance.
 
         Please see Signer.sign() documentation.
 
         Additionally raises:
-            securesystemslib.exceptions.FormatError: Key argument is malformed.
-            securesystemslib.exceptions.CryptoError, \
-                securesystemslib.exceptions.UnsupportedAlgorithmError:
-                Signing errors.
+            ValueError: scheme is unsupported
+            TODO: list pyca/cryptography errors
         """
-        sig_dict = sslib_keys.create_signature(self.key_dict, payload)
-        return Signature(**sig_dict)
+        if CRYPTO_IMPORT_ERROR:
+            raise exceptions.UnsupportedLibraryError(CRYPTO_IMPORT_ERROR)
+
+        scheme = self.key_dict["scheme"]
+        key: PrivateKeyTypes
+        if scheme in [
+            "rsassa-pss-sha224",
+            "rsassa-pss-sha256",
+            "rsassa-pss-sha384",
+            "rsassa-pss-sha512",
+            "rsa-pkcs1v15-sha224",
+            "rsa-pkcs1v15-sha256",
+            "rsa-pkcs1v15-sha384",
+            "rsa-pkcs1v15-sha512",
+        ]:
+            key = cast(RSAPrivateKey, self._from_pem())
+            padding_name, algo_name = scheme.split("-")[1:]
+            algo = self._hash_algo(algo_name)()
+            padding: AsymmetricPadding
+            if padding_name == "pss":
+                padding = PSS(mgf=MGF1(algo), salt_length=PSS.DIGEST_LENGTH)
+            else:
+                padding = PKCS1v15()
+            sig = key.sign(payload, padding, algo)
+
+        elif scheme in ["ecdsa-sha2-nistp256"]:
+            key = cast(EllipticCurvePrivateKey, self._from_pem())
+            sig = key.sign(payload, ECDSA(SHA256()))
+
+        elif scheme in ["ed25519"]:
+            private_bytes = bytes.fromhex(self.key_dict["keyval"]["private"])
+            key = Ed25519PrivateKey.from_private_bytes(private_bytes)
+            sig = key.sign(payload)
+        else:
+            raise ValueError(f"unknown scheme '{scheme}'")
+
+        return Signature(self.key_dict["keyid"], sig.hex())

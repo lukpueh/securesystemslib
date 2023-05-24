@@ -5,11 +5,7 @@ import unittest
 
 import securesystemslib.keys as KEYS
 from securesystemslib.dsse import Envelope
-from securesystemslib.exceptions import (
-    FormatError,
-    UnsupportedAlgorithmError,
-    VerificationError,
-)
+from securesystemslib.exceptions import VerificationError
 from securesystemslib.signer import Signature, SSlibKey, SSlibSigner
 
 
@@ -97,7 +93,7 @@ class TestEnvelope(unittest.TestCase):
             valid_scheme = key_dict["scheme"]
             key_dict["scheme"] = "invalid_scheme"
             signer = SSlibSigner(key_dict)
-            with self.assertRaises((FormatError, UnsupportedAlgorithmError)):
+            with self.assertRaises(ValueError):
                 envelope_obj.sign(signer)
 
             # Sign the payload.
