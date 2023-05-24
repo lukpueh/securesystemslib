@@ -12,9 +12,10 @@ from urllib import parse
 from securesystemslib import KEY_TYPE_ECDSA
 from securesystemslib.exceptions import UnsupportedLibraryError
 from securesystemslib.hash import digest
-from securesystemslib.signer._key import Key, SSlibKey
+from securesystemslib.signer._key import Key
 from securesystemslib.signer._signature import Signature
 from securesystemslib.signer._signer import SecretsHandler, Signer
+from securesystemslib.signer._sslib_signer import SSlibKey
 
 # pylint: disable=wrong-import-position
 CRYPTO_IMPORT_ERROR = None

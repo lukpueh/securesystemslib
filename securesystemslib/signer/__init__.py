@@ -7,13 +7,12 @@ Some implementations are provided by default but more can be added by users.
 from securesystemslib.signer._gcp_signer import GCPSigner
 from securesystemslib.signer._gpg_signer import GPGKey, GPGSigner
 from securesystemslib.signer._hsm_signer import HSMSigner
-from securesystemslib.signer._key import KEY_FOR_TYPE_AND_SCHEME, Key, SSlibKey
+from securesystemslib.signer._key import KEY_FOR_TYPE_AND_SCHEME, Key
 from securesystemslib.signer._signature import Signature
 from securesystemslib.signer._signer import (
     SIGNER_FOR_URI_SCHEME,
     SecretsHandler,
     Signer,
-    SSlibSigner,
 )
 from securesystemslib.signer._sigstore_signer import SigstoreKey, SigstoreSigner
 from securesystemslib.signer._spx_signer import (
@@ -21,6 +20,7 @@ from securesystemslib.signer._spx_signer import (
     SpxSigner,
     generate_spx_key_pair,
 )
+from securesystemslib.signer._sslib_signer import SSlibKey, SSlibSigner
 
 # Register supported private key uri schemes and the Signers implementing them
 SIGNER_FOR_URI_SCHEME.update(

@@ -7,12 +7,8 @@ from urllib import parse
 import securesystemslib.hash as sslib_hash
 from securesystemslib import exceptions
 from securesystemslib.signer._key import Key
-from securesystemslib.signer._signer import (
-    SecretsHandler,
-    Signature,
-    Signer,
-    SSlibKey,
-)
+from securesystemslib.signer._signer import SecretsHandler, Signature, Signer
+from securesystemslib.signer._sslib_signer import SSlibKey
 
 logger = logging.getLogger(__name__)
 
