@@ -4,11 +4,15 @@ from abc import ABCMeta, abstractmethod
 from typing import Any, Dict, Optional, Tuple, Type, Union
 
 from securesystemslib import exceptions
+from securesystemslib._vendor.ed25519.ed25519 import (
+    SignatureMismatch,
+    checkvalid,
+)
 from securesystemslib.signer._signature import Signature
 
 CRYPTO_IMPORT_ERROR = None
 try:
-    from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
+    from cryptography.exceptions import InvalidSignature
     from cryptography.hazmat.primitives.asymmetric.ec import (
         ECDSA,
         EllipticCurvePublicKey,
@@ -255,25 +259,32 @@ class SSlibKey(Key):
 
     def verify_signature(self, signature: Signature, data: bytes) -> None:
         try:
+            sig = bytes.fromhex(signature.signature)
+
             if CRYPTO_IMPORT_ERROR:
+                if self.keytype == "ed25519":
+                    # Verify using vendored ed25519 implementation
+                    pub = bytes.fromhex(self.keyval["public"])
+                    checkvalid(sig, data, pub)
+                    return
+
                 raise exceptions.UnsupportedLibraryError(CRYPTO_IMPORT_ERROR)
 
+            # Verify using pyca/cryptography
             key = self._load_key()
             args = self._load_args()
+            key.verify(sig, data, *args)
 
-            sig_bytes = bytes.fromhex(signature.signature)
-            key.verify(sig_bytes, data, *args)
+        # Workaround for 'except (SignatureMismatch, InvalidSignature)' to
+        # conditionally evaluate the optional 'InvalidSignature':
+        except Exception as e:
+            if isinstance(e, SignatureMismatch) or (
+                not CRYPTO_IMPORT_ERROR and isinstance(e, InvalidSignature)
+            ):
+                raise exceptions.UnverifiedSignatureError(
+                    f"Failed to verify signature by {self.keyid}"
+                ) from e
 
-        except InvalidSignature as e:
-            raise exceptions.UnverifiedSignatureError(
-                f"Failed to verify signature by {self.keyid}"
-            ) from e
-        except (
-            ValueError,
-            UnsupportedAlgorithm,
-            KeyError,
-            exceptions.UnsupportedLibraryError,
-        ) as e:
             logger.info("Key %s failed to verify sig: %s", self.keyid, str(e))
             raise exceptions.VerificationError(
                 f"Unknown failure to verify signature by {self.keyid}"
