@@ -20,9 +20,11 @@ try:
     from cryptography.exceptions import InvalidSignature
     from cryptography.hazmat.primitives.asymmetric.ec import (
         ECDSA,
+        EllipticCurvePrivateKey,
         EllipticCurvePublicKey,
     )
     from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+        Ed25519PrivateKey,
         Ed25519PublicKey,
     )
     from cryptography.hazmat.primitives.asymmetric.padding import (
@@ -32,6 +34,7 @@ try:
     )
     from cryptography.hazmat.primitives.asymmetric.rsa import (
         AsymmetricPadding,
+        RSAPrivateKey,
         RSAPublicKey,
     )
     from cryptography.hazmat.primitives.asymmetric.types import PublicKeyTypes
@@ -42,7 +45,10 @@ try:
         SHA512,
         HashAlgorithm,
     )
-    from cryptography.hazmat.primitives.serialization import load_pem_public_key
+    from cryptography.hazmat.primitives.serialization import (
+        load_pem_private_key,
+        load_pem_public_key,
+    )
 except ImportError:
     CRYPTO_IMPORT_ERROR = "'pyca/cryptography' library required"
 
@@ -211,6 +217,8 @@ class SSlibSigner(Signer):
         Additionally raises:
             OSError: Reading the file failed with "file:" URI
         """
+        # TODO: Check crypto import error
+
         if not isinstance(public_key, SSlibKey):
             raise ValueError(f"Expected SSlibKey for {priv_key_uri}")
 
@@ -242,9 +250,27 @@ class SSlibSigner(Signer):
         else:
             raise ValueError(f"SSlibSigner does not support {priv_key_uri}")
 
-        keydict = public_key.to_securesystemslib_key()
-        keydict["keyval"]["private"] = private
-        return cls(keydict)
+        if public_key.keytype == "rsa":
+            private_key = cast(
+                RSAPrivateKey,
+                load_pem_private_key(private.encode(), password=None),
+            )
+            return RSASigner(private_key, public_key)
+
+        if public_key.keytype == "ecdsa":
+            private_key = cast(
+                EllipticCurvePrivateKey,
+                load_pem_private_key(private.encode(), password=None),
+            )
+            return ECDSASigner(private_key, public_key)
+
+        if public_key.keytype == "ed25519":
+            private_key = Ed25519PrivateKey.from_private_bytes(
+                bytes.fromhex(private)
+            )
+            return Ed25519Signer(private_key, public_key)
+
+        raise ValueError(f"unsupported public keytype: {public_key.keytype}")
 
     def sign(self, payload: bytes) -> Signature:
         """Signs a given payload by the key assigned to the SSlibSigner instance.
@@ -259,3 +285,48 @@ class SSlibSigner(Signer):
         """
         sig_dict = sslib_keys.create_signature(self.key_dict, payload)
         return Signature(**sig_dict)
+
+
+class RSASigner(SSlibSigner):
+    def __init__(self, private: "RSAPrivateKey", public: SSlibKey):
+        self.private_key = private
+        self.public_key = public
+
+    def sign(self, payload: bytes) -> Signature:
+        # TODO: Check crypto import error
+        # TODO: Check scheme supported
+        # TODO: Cleanup hash/padding-from-scheme and deduplicate with pubkey
+        padding_name, algo_name = self.public_key.scheme.split("-")[1:]
+        algo = self.public_key._hash_algo(algo_name)()
+        padding: AsymmetricPadding
+        if padding_name == "pss":
+            padding = PSS(mgf=MGF1(algo), salt_length=PSS.DIGEST_LENGTH)
+        else:
+            padding = PKCS1v15()
+
+        sig = self.private_key.sign(payload, padding, algo)
+        return Signature(self.public_key.keyid, sig.hex())
+
+
+class ECDSASigner(SSlibSigner):
+    def __init__(self, private: "EllipticCurvePrivateKey", public: SSlibKey):
+        self.private_key = private
+        self.public_key = public
+
+    def sign(self, payload: bytes) -> Signature:
+        # TODO: Check crypto import error
+        # TODO: Check scheme supported
+        sig = self.private_key.sign(payload, ECDSA(SHA256()))
+        return Signature(self.public_key.keyid, sig.hex())
+
+
+class Ed25519Signer(SSlibSigner):
+    def __init__(self, private: "Ed25519PrivateKey", public: SSlibKey):
+        self.private_key = private
+        self.public_key = public
+
+    def sign(self, payload: bytes) -> Signature:
+        # TODO: Check crypto import error
+        # TODO: Check scheme supported
+        sig = self.private_key.sign(payload)
+        return Signature(self.public_key.keyid, sig.hex())
