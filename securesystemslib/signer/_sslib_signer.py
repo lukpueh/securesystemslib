@@ -37,6 +37,9 @@ try:
         RSAPrivateKey,
         RSAPublicKey,
     )
+    from cryptography.hazmat.primitives.asymmetric.rsa import (
+        generate_private_key as generate_private_rsa_key,
+    )
     from cryptography.hazmat.primitives.asymmetric.types import (
         PrivateKeyTypes,
         PublicKeyTypes,
@@ -49,6 +52,10 @@ try:
         HashAlgorithm,
     )
     from cryptography.hazmat.primitives.serialization import (
+        Encoding,
+        NoEncryption,
+        PrivateFormat,
+        PublicFormat,
         load_pem_private_key,
         load_pem_public_key,
     )
@@ -57,6 +64,54 @@ except ImportError:
 
 
 logger = logging.getLogger(__name__)
+
+_RSA_KEY_TYPE = "rsa"
+_RSA_PUBLIC_EXPONENT = 65537
+_RSA_DEFAULT_SCHEME = "rsassa-pss-sha256"
+_RSA_DEFAULT_KEY_SIZE = 3072
+
+
+def generate_rsa_key(
+    key_size: int = _RSA_DEFAULT_KEY_SIZE, scheme: str = _RSA_DEFAULT_SCHEME
+) -> Dict[str, Any]:
+    """Generate RSA key pair and return as legacy keydict."""
+
+    if CRYPTO_IMPORT_ERROR:
+        raise exceptions.UnsupportedLibraryError(CRYPTO_IMPORT_ERROR)
+
+    private = generate_private_rsa_key(_RSA_PUBLIC_EXPONENT, key_size)
+
+    private_pem = private.private_bytes(
+        encoding=Encoding.PEM,
+        format=PrivateFormat.TraditionalOpenSSL,
+        encryption_algorithm=NoEncryption(),
+    ).decode()
+    public_pem = (
+        private.public_key()
+        .public_bytes(
+            encoding=Encoding.PEM, format=PublicFormat.SubjectPublicKeyInfo
+        )
+        .decode()
+    )
+
+    keyid = Signer._get_keyid(  # pylint: disable=protected-access
+        _RSA_KEY_TYPE, scheme, {"public": public_pem}
+    )
+
+    return {
+        "keytype": _RSA_KEY_TYPE,
+        "scheme": scheme,
+        "keyid": keyid,
+        "keyval": {"public": public_pem, "private": private_pem},
+    }
+
+
+def generate_ecdsa_key():
+    pass
+
+
+def generate_ed25519_key():
+    pass
 
 
 class SSlibKey(Key):
