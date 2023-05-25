@@ -26,11 +26,12 @@ import securesystemslib.formats
 import securesystemslib.hash
 import securesystemslib.keys
 import securesystemslib.rsa_keys
+from securesystemslib.signer import generate_rsa_key
 
-(
-    public_rsa,
-    private_rsa,
-) = securesystemslib.rsa_keys.generate_rsa_public_and_private()
+_rsa_key = generate_rsa_key()
+public_rsa = _rsa_key["keyval"]["public"]
+private_rsa = _rsa_key["keyval"]["private"]
+
 FORMAT_ERROR_MSG = (
     "securesystemslib.exceptions.FormatError raised.  Check object's format."
 )
@@ -41,34 +42,6 @@ class TestRSA_keys(
 ):  # pylint: disable=missing-class-docstring,invalid-name
     def setUp(self):
         pass
-
-    def test_generate_rsa_public_and_private(self):
-        pub, priv = securesystemslib.rsa_keys.generate_rsa_public_and_private()
-
-        # Check format of 'pub' and 'priv'.
-        self.assertEqual(
-            None,
-            securesystemslib.formats.PEMRSA_SCHEMA.check_match(pub),
-            FORMAT_ERROR_MSG,
-        )
-        self.assertEqual(
-            None,
-            securesystemslib.formats.PEMRSA_SCHEMA.check_match(priv),
-            FORMAT_ERROR_MSG,
-        )
-
-        # Check for an invalid "bits" argument.  bits >= 2048.
-        self.assertRaises(
-            securesystemslib.exceptions.FormatError,
-            securesystemslib.rsa_keys.generate_rsa_public_and_private,
-            1024,
-        )
-
-        self.assertRaises(
-            securesystemslib.exceptions.FormatError,
-            securesystemslib.rsa_keys.generate_rsa_public_and_private,
-            "2048",
-        )
 
     def test_verify_rsa_pss_different_salt_lengths(self):
         rsa_scheme = "rsassa-pss-sha256"

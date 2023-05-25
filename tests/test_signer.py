@@ -29,6 +29,7 @@ from securesystemslib.signer import (
     SpxSigner,
     SSlibKey,
     SSlibSigner,
+    generate_rsa_key,
     generate_spx_key_pair,
 )
 
@@ -278,7 +279,7 @@ class TestSigner(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.keys = [
-            KEYS.generate_rsa_key(),
+            generate_rsa_key(),
             KEYS.generate_ed25519_key(),
             KEYS.generate_ecdsa_key(),
         ]

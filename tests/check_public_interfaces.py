@@ -183,7 +183,7 @@ class TestPublicInterfaces(
         with self.assertRaises(
             securesystemslib.exceptions.UnsupportedLibraryError
         ):
-            securesystemslib.keys.generate_rsa_key()
+            securesystemslib.signer.generate_rsa_key()
 
         with self.assertRaises(
             securesystemslib.exceptions.UnsupportedLibraryError

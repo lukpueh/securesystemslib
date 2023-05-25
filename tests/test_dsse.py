@@ -6,7 +6,12 @@ import unittest
 import securesystemslib.keys as KEYS
 from securesystemslib.dsse import Envelope
 from securesystemslib.exceptions import VerificationError
-from securesystemslib.signer import Signature, SSlibKey, SSlibSigner
+from securesystemslib.signer import (
+    Signature,
+    SSlibKey,
+    SSlibSigner,
+    generate_rsa_key,
+)
 
 
 class TestEnvelope(unittest.TestCase):
@@ -15,7 +20,7 @@ class TestEnvelope(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.key_dicts = [
-            KEYS.generate_rsa_key(),
+            generate_rsa_key(),
             KEYS.generate_ed25519_key(),
             KEYS.generate_ecdsa_key(),
         ]
@@ -124,7 +129,7 @@ class TestEnvelope(unittest.TestCase):
 
         # Test for unknown keys and threshold of 1.
         new_key_dicts = [
-            KEYS.generate_rsa_key(),
+            generate_rsa_key(),
             KEYS.generate_ed25519_key(),
             KEYS.generate_ecdsa_key(),
         ]

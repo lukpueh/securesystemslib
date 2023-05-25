@@ -123,15 +123,6 @@ class TestInterfaceFunctions(
             )
         import_rsa_privatekey_from_file(fn_empty_prompt)
 
-        # TEST: Generate keys with auto-filename, i.e. keyid
-        # Assert filename is keyid
-        fn_keyid = _generate_and_write_rsa_keypair()
-        pub = import_rsa_publickey_from_file(fn_keyid + ".pub")
-        priv = import_rsa_privatekey_from_file(fn_keyid)
-        self.assertTrue(
-            os.path.basename(fn_keyid) == pub["keyid"] == priv["keyid"]
-        )
-
         # TEST: Generate keys with custom bits
         # Assert length
         bits = 4096

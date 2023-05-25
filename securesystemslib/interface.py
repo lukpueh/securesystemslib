@@ -35,6 +35,7 @@ from securesystemslib import (
     settings,
     util,
 )
+from securesystemslib.signer import generate_rsa_key
 from securesystemslib.storage import FilesystemBackend
 
 logger = logging.getLogger(__name__)
@@ -208,7 +209,7 @@ def _generate_and_write_rsa_keypair(
     formats.RSAKEYBITS_SCHEMA.check_match(bits)
 
     # Generate private RSA key and extract public and private both in PEM
-    rsa_key = keys.generate_rsa_key(bits)
+    rsa_key = generate_rsa_key(bits)
     public = rsa_key["keyval"]["public"]
     private = rsa_key["keyval"]["private"]
 
