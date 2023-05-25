@@ -89,51 +89,6 @@ class TestECDSA_keys(
             123,
         )
 
-    def test_create_signature(self):
-        global public  # pylint: disable=global-variable-not-assigned
-        global private  # pylint: disable=global-variable-not-assigned
-        data = b"The quick brown fox jumps over the lazy dog"
-        signature, method = securesystemslib.ecdsa_keys.create_signature(
-            public, private, data
-        )
-
-        # Verify format of returned values.
-        self.assertEqual(
-            True,
-            securesystemslib.formats.ECDSASIGNATURE_SCHEMA.matches(signature),
-        )
-
-        self.assertEqual(
-            True, securesystemslib.formats.NAME_SCHEMA.matches(method)
-        )
-        self.assertEqual("ecdsa-sha2-nistp256", method)
-
-        # Check for improperly formatted argument.
-        self.assertRaises(
-            securesystemslib.exceptions.FormatError,
-            securesystemslib.ecdsa_keys.create_signature,
-            123,
-            private,
-            data,
-        )
-
-        self.assertRaises(
-            securesystemslib.exceptions.FormatError,
-            securesystemslib.ecdsa_keys.create_signature,
-            public,
-            123,
-            data,
-        )
-
-        # Check for invalid 'data'.
-        self.assertRaises(
-            securesystemslib.exceptions.CryptoError,
-            securesystemslib.ecdsa_keys.create_signature,
-            public,
-            private,
-            123,
-        )
-
 
 # Run the unit tests.
 if __name__ == "__main__":

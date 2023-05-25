@@ -24,8 +24,8 @@
   https://en.wikipedia.org/wiki/Elliptic_Curve_Digital_Signature_Algorithm
 
   The (RSA, ECDSA and Ed25519)-related functions provided include
-  generate_rsa_key(), generate_ed25519_key(), generate_ecdsa_key() and
-  create_signature().  The cryptography libraries
+  generate_rsa_key(), generate_ed25519_key() and generate_ecdsa_key().
+  The cryptography libraries
   called by 'securesystemslib.keys.py' generate the actual keys and the
   functions listed above can be viewed as the easy-to-use public interface.
 
@@ -33,8 +33,7 @@
   format_metadata_to_key().  These last two functions produce or use keys
   compatible with the key structures listed in Metadata files.  The key
   generation functions return a dictionary containing all the information needed
-  of keys, such as public & private keys, and a keyID.  create_signature()
-  is a supplemental function needed for generating signatures.
+  of keys, such as public & private keys, and a keyID.
 
   Key IDs are used as identifiers for keys (e.g., RSA key).  They are the
   hexadecimal representation of the hash of the key object (specifically, the
@@ -562,140 +561,6 @@ def _get_keyid(keytype, scheme, key_value, hash_algorithm="sha256"):
     keyid = digest_object.hexdigest()
 
     return keyid
-
-
-def create_signature(key_dict, data):
-    """
-    <Purpose>
-      Return a signature dictionary of the form:
-      {'keyid': 'f30a0870d026980100c0573bd557394f8c1bbd6...',
-       'sig': '...'}.
-
-      The signing process will use the private key in
-      key_dict['keyval']['private'] and 'data' to generate the signature.
-
-      The following signature schemes are supported:
-
-      'RSASSA-PSS'
-      RFC3447 - RSASSA-PSS
-      http://www.ietf.org/rfc/rfc3447.
-
-      'ed25519'
-      ed25519 - high-speed high security signatures
-      http://ed25519.cr.yp.to/
-
-      Which signature to generate is determined by the key type of 'key_dict'
-      and the available cryptography library specified in 'settings'.
-
-      >>> ed25519_key = generate_ed25519_key()
-      >>> data = 'The quick brown fox jumps over the lazy dog'
-      >>> signature = create_signature(ed25519_key, data)
-      >>> securesystemslib.formats.SIGNATURE_SCHEMA.matches(signature)
-      True
-      >>> len(signature['sig'])
-      128
-      >>> rsa_key = generate_rsa_key(2048)
-      >>> signature = create_signature(rsa_key, data)
-      >>> securesystemslib.formats.SIGNATURE_SCHEMA.matches(signature)
-      True
-      >>> ecdsa_key = generate_ecdsa_key()
-      >>> signature = create_signature(ecdsa_key, data)
-      >>> securesystemslib.formats.SIGNATURE_SCHEMA.matches(signature)
-      True
-
-    <Arguments>
-      key_dict:
-        A dictionary containing the keys.  An example RSA key dict has the
-        form:
-
-        {'keytype': 'rsa',
-         'scheme': 'rsassa-pss-sha256',
-         'keyid': 'f30a0870d026980100c0573bd557394f8c1bbd6...',
-         'keyval': {'public': '-----BEGIN RSA PUBLIC KEY----- ...',
-                    'private': '-----BEGIN RSA PRIVATE KEY----- ...'}}
-
-        The public and private keys are strings in PEM format.
-
-      data:
-        Data to be signed. This should be a bytes object; data should be
-        encoded/serialized before it is passed here.
-
-    <Exceptions>
-      securesystemslib.exceptions.FormatError, if 'key_dict' is improperly
-      formatted.
-
-      securesystemslib.exceptions.UnsupportedAlgorithmError, if 'key_dict'
-      specifies an unsupported key type or signing scheme.
-
-      securesystemslib.exceptions.CryptoError, if the signature cannot be
-      generated.
-
-      TypeError, if 'key_dict' contains an invalid keytype.
-
-    <Side Effects>
-      The cryptography library specified in 'settings' is called to perform the
-      actual signing routine.
-
-    <Returns>
-      A signature dictionary conformant to
-      'securesystemslib_format.SIGNATURE_SCHEMA'.
-    """
-
-    # Does 'key_dict' have the correct format?
-    # This check will ensure 'key_dict' has the appropriate number of objects
-    # and object types, and that all dict keys are properly named.
-    # Raise 'securesystemslib.exceptions.FormatError' if the check fails.
-    # The key type of 'key_dict' must be either 'rsa' or 'ed25519'.
-    formats.ANYKEY_SCHEMA.check_match(key_dict)
-
-    # Signing the 'data' object requires a private key. Signing schemes that are
-    # currently supported are: 'ed25519', 'ecdsa-sha2-nistp256',
-    # 'ecdsa-sha2-nistp384' and rsa schemes defined in
-    # `securesystemslib.keys.RSA_SIGNATURE_SCHEMES`.
-    # RSASSA-PSS and RSA-PKCS1v15 keys and signatures can be generated and
-    # verified by rsa_keys.py, and Ed25519 keys by PyNaCl and PyCA's
-    # optimized, pure python implementation of Ed25519.
-    signature = {}
-    keytype = key_dict["keytype"]
-    scheme = key_dict["scheme"]
-    public = key_dict["keyval"]["public"]
-    private = key_dict["keyval"]["private"]
-    keyid = key_dict["keyid"]
-    sig = None
-
-    if keytype == "rsa":
-        if scheme in RSA_SIGNATURE_SCHEMES:
-            private = private.replace("\r\n", "\n")
-            sig, scheme = rsa_keys.create_rsa_signature(private, data, scheme)
-
-        else:
-            raise exceptions.UnsupportedAlgorithmError(
-                "Unsupported" " RSA signature scheme specified: " + repr(scheme)
-            )
-
-    elif keytype == "ed25519":
-        public = binascii.unhexlify(public.encode("utf-8"))
-        private = binascii.unhexlify(private.encode("utf-8"))
-        sig, scheme = ed25519_keys.create_signature(
-            public, private, data, scheme
-        )
-
-    # Continue to support keytypes of ecdsa-sha2-nistp256 and ecdsa-sha2-nistp384
-    # for backwards compatibility with older securesystemslib releases
-    elif keytype in ["ecdsa", "ecdsa-sha2-nistp256", "ecdsa-sha2-nistp384"]:
-        sig, scheme = ecdsa_keys.create_signature(public, private, data, scheme)
-
-    # 'securesystemslib.formats.ANYKEY_SCHEMA' should have detected invalid key
-    # types.  This is a defensive check against an invalid key type.
-    else:  # pragma: no cover
-        raise TypeError("Invalid key type.")
-
-    # Build the signature dictionary to be returned.
-    # The hexadecimal representation of 'sig' is stored in the signature.
-    signature["keyid"] = keyid
-    signature["sig"] = binascii.hexlify(sig).decode()
-
-    return signature
 
 
 def import_rsakey_from_private_pem(
