@@ -11,7 +11,6 @@ import securesystemslib.keys as KEYS
 from securesystemslib.exceptions import (
     CryptoError,
     FormatError,
-    UnsupportedAlgorithmError,
     UnverifiedSignatureError,
     VerificationError,
 )
@@ -381,39 +380,31 @@ class TestSigner(unittest.TestCase):
     def test_sslib_signer_sign(self):
         for scheme_dict in self.keys:
             # Test generation of signatures.
-            sslib_signer = SSlibSigner(scheme_dict)
+            sslib_signer = SSlibSigner.from_securesystemslib_key(scheme_dict)
             public_key = SSlibKey.from_securesystemslib_key(scheme_dict)
             sig_obj = sslib_signer.sign(self.DATA)
 
             # Verify signature
             self.assertIsNone(public_key.verify_signature(sig_obj, self.DATA))
 
-            # Removing private key from "scheme_dict".
-            private = scheme_dict["keyval"]["private"]
-            scheme_dict["keyval"]["private"] = ""
-            sslib_signer.key_dict = scheme_dict
-
-            with self.assertRaises((ValueError, FormatError)):
-                sslib_signer.sign(self.DATA)
-
-            scheme_dict["keyval"]["private"] = private
-
             # Test for invalid signature scheme.
-            valid_scheme = scheme_dict["scheme"]
-            scheme_dict["scheme"] = "invalid_scheme"
-            sslib_signer = SSlibSigner(scheme_dict)
+            sslib_signer = SSlibSigner.from_securesystemslib_key(scheme_dict)
+            sslib_signer.public_key.scheme = "invalid_scheme"
 
-            with self.assertRaises((UnsupportedAlgorithmError, FormatError)):
+            with self.assertRaises(ValueError):
                 sslib_signer.sign(self.DATA)
-
-            scheme_dict["scheme"] = valid_scheme
 
     def test_custom_signer(self):
+        # pylint: disable=import-outside-toplevel
+        from cryptography.hazmat.primitives import serialization
+
+        from securesystemslib.signer._sslib_signer import RSASigner
+
         # setup
         key = self.keys[0]
         pubkey = SSlibKey.from_securesystemslib_key(key)
 
-        class CustomSigner(SSlibSigner):
+        class CustomSigner(RSASigner):
             """Custom signer with a hard coded key"""
 
             CUSTOM_SCHEME = "custom"
@@ -425,7 +416,10 @@ class TestSigner(unittest.TestCase):
                 public_key: Key,
                 secrets_handler: Optional[SecretsHandler] = None,
             ) -> "CustomSigner":
-                return cls(key)
+                private = serialization.load_pem_private_key(
+                    key["keyval"]["private"].encode(), password=None
+                )
+                return cls(private, pubkey)
 
         # register custom signer
         SIGNER_FOR_URI_SCHEME[CustomSigner.CUSTOM_SCHEME] = CustomSigner
