@@ -110,6 +110,12 @@ class SSlibKey(Key):
 
     def verify_signature(self, signature: Signature, data: bytes) -> None:
         try:
+            if signature.keyid != self.keyid:
+                raise ValueError(
+                    f"keyid mismatch: 'key id: {self.keyid}"
+                    f" != signature keyid: {signature.keyid}'"
+                )
+
             sig = bytes.fromhex(signature.signature)
 
             if CRYPTO_IMPORT_ERROR:
