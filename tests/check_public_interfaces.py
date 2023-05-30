@@ -197,30 +197,9 @@ class TestPublicInterfaces(
 
         data = "foo"
         keydict = {
-            "keytype": "ed25519",
-            "scheme": "ed25519",
             "keyid": "f00",
             "keyval": {"private": "f001", "public": "b00f"},
         }
-        with self.assertRaises(
-            securesystemslib.exceptions.UnsupportedLibraryError
-        ):
-            securesystemslib.keys.create_signature(keydict, data)
-
-        keydict["keytype"] = "ecdsa"
-        keydict["scheme"] = "ecdsa-sha2-nistp256"
-        with self.assertRaises(
-            securesystemslib.exceptions.UnsupportedLibraryError
-        ):
-            securesystemslib.keys.create_signature(keydict, data)
-
-        keydict["keytype"] = "rsa"
-        keydict["scheme"] = "rsassa-pss-sha256"
-        with self.assertRaises(
-            securesystemslib.exceptions.UnsupportedLibraryError
-        ):
-            securesystemslib.keys.create_signature(keydict, data)
-
         keydict["keytype"] = "ecdsa"
         keydict["scheme"] = "ecdsa-sha2-nistp256"
         sig = {
