@@ -264,6 +264,31 @@ class SSlibSigner(Signer):
         return self._crypto_signer.sign(payload)
 
 
+# TODO:
+# - Add functions for each keytype that export keydict, calling below functions
+# - Add functions for each keytpye that import currently available key wire formats into keydict
+# - Consider encryption/decryption for keydict import/export functions only
+# - rethink module hierarchy (maybe move out CryptoSigner?), beware of circular dependency, SSlibSigner needs CryptoSigner
+
+
+def generate_rsa() -> RSAPrivateKey:
+    private_key: RSAPrivateKey
+    # TODO: use pyca/cryptography to generate private key
+    return private_key
+
+
+def generate_ecdsa() -> EllipticCurvePrivateKey:
+    private_key: EllipticCurvePrivateKey
+    # TODO: use pyca/cryptography to generate private key
+    return private_key
+
+
+def generate_ed25519() -> Ed25519PrivateKey:
+    private_key: Ed25519PrivateKey
+    # TODO: use pyca/cryptography to generate private key
+    return private_key
+
+
 class CryptoSigner(Signer, metaclass=ABCMeta):
     """Base class for PYCA/cryptography Signer implementations."""
 
@@ -372,6 +397,12 @@ class RSASigner(CryptoSigner):
         sig = self._private_key.sign(payload, self._padding, self._algorithm)
         return Signature(self.public_key.keyid, sig.hex())
 
+    @classmethod
+    def from_crypto(cls, private_key) -> RSAPrivateKey:
+        public_key: SSlibKey
+        # TODO: Construct public_key from private_key
+        return cls(public_key, private_key)
+
 
 class ECDSASigner(CryptoSigner):
     """pyca/cryptography ecdsa signer implementation"""
@@ -390,6 +421,12 @@ class ECDSASigner(CryptoSigner):
         sig = self._private_key.sign(payload, self._signature_algorithm)
         return Signature(self.public_key.keyid, sig.hex())
 
+    @classmethod
+    def from_crypto(cls, private_key) -> EllipticCurvePrivateKey:
+        public_key: SSlibKey
+        # TODO: Construct public_key from private_key
+        return cls(public_key, private_key)
+
 
 class Ed25519Signer(CryptoSigner):
     """pyca/cryptography ecdsa signer implementation"""
@@ -404,3 +441,9 @@ class Ed25519Signer(CryptoSigner):
     def sign(self, payload: bytes) -> Signature:
         sig = self._private_key.sign(payload)
         return Signature(self.public_key.keyid, sig.hex())
+
+    @classmethod
+    def from_crypto(cls, private_key) -> Ed25519PrivateKey:
+        public_key: SSlibKey
+        # TODO: Construct public_key from private_key
+        return cls(public_key, private_key)
