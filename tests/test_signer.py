@@ -22,6 +22,7 @@ from securesystemslib.signer import (
     GPGKey,
     GPGSigner,
     Key,
+    RSASigner,
     SecretsHandler,
     Signature,
     Signer,
@@ -678,6 +679,21 @@ class TestSphincs(unittest.TestCase):
                 signer.public_key.keyid, signer.public_key.to_dict()
             ),
         )
+
+
+class TestRSASigner(unittest.TestCase):
+    def test_generate(self):
+        signer = RSASigner.generate()
+
+        # TODO: Does generate need to test sign?
+        sig = signer.sign(b"DATA")
+        self.assertIsNone(signer.public_key.verify_signature(sig, b"DATA"))
+        with self.assertRaises(UnverifiedSignatureError):
+            signer.public_key.verify_signature(sig, b"NOT DATA")
+
+        # TODO: Test generate with different bits
+        # TODO: Test generate with different schemes
+        #       HINT: consider time optimization by mocking keygen
 
 
 # Run the unit tests.

@@ -12,6 +12,7 @@ from securesystemslib.signer._key import KEY_FOR_TYPE_AND_SCHEME, Key, SSlibKey
 from securesystemslib.signer._signature import Signature
 from securesystemslib.signer._signer import (
     SIGNER_FOR_URI_SCHEME,
+    RSASigner,
     SecretsHandler,
     Signer,
     SSlibSigner,

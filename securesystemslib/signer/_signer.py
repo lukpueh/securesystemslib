@@ -32,6 +32,9 @@ try:
         AsymmetricPadding,
         RSAPrivateKey,
     )
+    from cryptography.hazmat.primitives.asymmetric.rsa import (
+        generate_private_key as generate_rsa_private_key,
+    )
     from cryptography.hazmat.primitives.asymmetric.types import PrivateKeyTypes
     from cryptography.hazmat.primitives.hashes import (
         SHA224,
@@ -41,6 +44,8 @@ try:
         HashAlgorithm,
     )
     from cryptography.hazmat.primitives.serialization import (
+        Encoding,
+        PublicFormat,
         load_pem_private_key,
     )
 except ImportError:
@@ -314,6 +319,11 @@ class CryptoSigner(Signer, metaclass=ABCMeta):
         # Do not raise NotImplementedError to appease pylint for all subclasses
         raise RuntimeError("use SSlibSigner.from_priv_key_uri")
 
+    @classmethod
+    def generate(cls) -> "CryptoSigner":
+        """Generate new key pair."""
+        raise NotImplementedError
+
 
 class RSASigner(CryptoSigner):
     """pyca/cryptography rsa signer implementation"""
@@ -336,6 +346,41 @@ class RSASigner(CryptoSigner):
         padding_name, hash_name = public_key.scheme.split("-")[1:]
         self._algorithm = self._get_hash_algorithm(hash_name)
         self._padding = self._get_rsa_padding(padding_name, self._algorithm)
+
+    @classmethod
+    def _create_public_key(
+        cls, private_key: RSAPrivateKey, scheme: str
+    ) -> SSlibKey:
+        """Helper to create SSlibKey from pyca/crypto private key."""
+        # TODO: This probably should be on SSlibKey._from_crypto, because the
+        # exact keyval format does not need to be known in CryptoSigner
+        #  (CryptoSigners could be used with other keys too). Also, this looks
+        #  the same for rsa and ecdsa, only ed25519 is different. COuld use one
+        #  method for all three.
+
+        public_key = private_key.public_key()
+        public_pem = public_key.public_bytes(
+            encoding=Encoding.PEM, format=PublicFormat.SubjectPublicKeyInfo
+        )
+        keytype = "rsa"
+        keyval = {"public": public_pem.decode()}
+        keyid = cls._get_keyid(keytype, scheme, keyval)
+        return SSlibKey(keyid, keytype, scheme, keyval)
+
+    @classmethod
+    def generate(
+        cls, scheme: str = "rsassa-pss-sha256", size: int = 3072
+    ) -> "RSASigner":
+        """Generate new rsa key pair."""
+        if CRYPTO_IMPORT_ERROR:
+            raise UnsupportedLibraryError(CRYPTO_IMPORT_ERROR)
+
+        private_key = generate_rsa_private_key(
+            public_exponent=65537,
+            key_size=size,
+        )
+        public_key = cls._create_public_key(private_key, scheme)
+        return cls(public_key, private_key)
 
     @staticmethod
     def _get_hash_algorithm(name: str) -> "HashAlgorithm":
