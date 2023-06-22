@@ -319,11 +319,6 @@ class CryptoSigner(Signer, metaclass=ABCMeta):
         # Do not raise NotImplementedError to appease pylint for all subclasses
         raise RuntimeError("use SSlibSigner.from_priv_key_uri")
 
-    @classmethod
-    def generate(cls) -> "CryptoSigner":
-        """Generate new key pair."""
-        raise NotImplementedError
-
 
 class RSASigner(CryptoSigner):
     """pyca/cryptography rsa signer implementation"""
