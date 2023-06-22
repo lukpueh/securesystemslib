@@ -5,6 +5,7 @@ import os
 import shutil
 import tempfile
 import unittest
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 import securesystemslib.keys as KEYS
@@ -694,6 +695,40 @@ class TestRSASigner(unittest.TestCase):
         # TODO: Test generate with different bits
         # TODO: Test generate with different schemes
         #       HINT: consider time optimization by mocking keygen
+
+    def test_from_priv_key_uri(self):
+        key_dir = Path(__file__).parent / "data" / "pems"
+        handler = lambda sec: "hunter2"
+
+        # Hack to create SSlibKey from private key
+        # TODO: Add SSlibKey-from-public-PEM function
+        from cryptography.hazmat.primitives.serialization import (
+            load_pem_private_key,
+        )
+
+        with open(key_dir / "rsa_private.pem", "rb") as f:
+            data = f.read()
+        private_key = load_pem_private_key(data, None)
+        public_key = RSASigner._create_public_key(
+            private_key, "rsassa-pss-sha256"
+        )
+
+        test_data = [
+            (f"file:{key_dir / 'rsa_private.pem'}?encrypted=false", None),
+            (
+                f"file:{key_dir / 'rsa_private_encrypted.pem'}?encrypted=true",
+                handler,
+            ),
+        ]
+
+        for uri, handler in test_data:
+            signer = RSASigner.from_priv_key_uri(uri, public_key, handler)
+
+            # TODO: Does test_from_priv_key_uri need to test sign/verify?
+            sig = signer.sign(b"DATA")
+            self.assertIsNone(signer.public_key.verify_signature(sig, b"DATA"))
+            with self.assertRaises(UnverifiedSignatureError):
+                signer.public_key.verify_signature(sig, b"NOT DATA")
 
 
 # Run the unit tests.
