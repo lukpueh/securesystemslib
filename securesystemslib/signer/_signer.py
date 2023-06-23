@@ -15,7 +15,11 @@ CRYPTO_IMPORT_ERROR = None
 try:
     from cryptography.hazmat.primitives.asymmetric.ec import (
         ECDSA,
+        SECP256R1,
         EllipticCurvePrivateKey,
+    )
+    from cryptography.hazmat.primitives.asymmetric.ec import (
+        generate_private_key as generate_ec_private_key,
     )
     from cryptography.hazmat.primitives.asymmetric.ed25519 import (
         Ed25519PrivateKey,
@@ -46,6 +50,7 @@ try:
     )
 except ImportError:
     CRYPTO_IMPORT_ERROR = "'pyca/cryptography' library required"
+
 
 logger = logging.getLogger(__name__)
 
@@ -459,6 +464,22 @@ class ECDSASigner(CryptoSigner):
         sig = self._private_key.sign(payload, self._signature_algorithm)
         return Signature(self.public_key.keyid, sig.hex())
 
+    @classmethod
+    def generate(
+        cls,
+        keyid: Optional[str] = None,
+        scheme: Optional[str] = None,
+    ) -> "ECDSASigner":
+        """Generate new rsa key pair."""
+        if CRYPTO_IMPORT_ERROR:
+            raise UnsupportedLibraryError(CRYPTO_IMPORT_ERROR)
+
+        private_key = generate_ec_private_key(SECP256R1)
+        public_key = SSlibKey._from_crypto_public_key_types(  # pylint: disable=protected-access
+            private_key.public_key(), keyid, scheme
+        )
+        return cls(public_key, private_key)
+
 
 class Ed25519Signer(CryptoSigner):
     """pyca/cryptography ecdsa signer implementation"""
@@ -473,3 +494,19 @@ class Ed25519Signer(CryptoSigner):
     def sign(self, payload: bytes) -> Signature:
         sig = self._private_key.sign(payload)
         return Signature(self.public_key.keyid, sig.hex())
+
+    @classmethod
+    def generate(
+        cls,
+        keyid: Optional[str] = None,
+        scheme: Optional[str] = None,
+    ) -> "ECDSASigner":
+        """Generate new rsa key pair."""
+        if CRYPTO_IMPORT_ERROR:
+            raise UnsupportedLibraryError(CRYPTO_IMPORT_ERROR)
+
+        private_key = Ed25519PrivateKey.generate()
+        public_key = SSlibKey._from_crypto_public_key_types(  # pylint: disable=protected-access
+            private_key.public_key(), keyid, scheme
+        )
+        return cls(public_key, private_key)

@@ -20,6 +20,8 @@ from securesystemslib.gpg.exceptions import CommandError, KeyNotFoundError
 from securesystemslib.signer import (
     KEY_FOR_TYPE_AND_SCHEME,
     SIGNER_FOR_URI_SCHEME,
+    ECDSASigner,
+    Ed25519Signer,
     GPGKey,
     GPGSigner,
     Key,
@@ -768,20 +770,24 @@ class TestCryptoSigner(unittest.TestCase):
                 with self.assertRaises(UnverifiedSignatureError):
                     signer.public_key.verify_signature(sig, b"NOT DATA")
 
-
-class TestRSASigner(unittest.TestCase):
     def test_generate(self):
-        signer = RSASigner.generate()
+        signers = [
+            RSASigner.generate(),
+            ECDSASigner.generate(),
+            Ed25519Signer.generate(),
+        ]
+        for signer in signers:
+            # TODO: Does generate need to test sign?
+            sig = signer.sign(b"DATA")
+            self.assertIsNone(signer.public_key.verify_signature(sig, b"DATA"))
+            with self.assertRaises(UnverifiedSignatureError):
+                signer.public_key.verify_signature(sig, b"NOT DATA")
 
-        # TODO: Does generate need to test sign?
-        sig = signer.sign(b"DATA")
-        self.assertIsNone(signer.public_key.verify_signature(sig, b"DATA"))
-        with self.assertRaises(UnverifiedSignatureError):
-            signer.public_key.verify_signature(sig, b"NOT DATA")
+            print(signer.public_key.to_dict())
 
-        # TODO: Test generate with different bits
-        # TODO: Test generate with different schemes
-        #       HINT: consider time optimization by mocking keygen
+            # TODO: Test rsa generate with different bits
+            # TODO: Test generate with different schemes
+            #       HINT: consider time optimization by mocking keygen
 
 
 # Run the unit tests.
