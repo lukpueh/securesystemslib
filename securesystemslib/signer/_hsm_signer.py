@@ -321,7 +321,7 @@ class HSMSigner(Signer):
 
         keyval = {"public": public_pem}
         scheme = _SCHEME_FOR_CURVE[curve]
-        keyid = cls._get_keyid(KEY_TYPE_ECDSA, scheme, keyval)
+        keyid = Key.get_default_keyid(KEY_TYPE_ECDSA, scheme, keyval)
         key = SSlibKey(keyid, KEY_TYPE_ECDSA, scheme, keyval)
 
         return uri, key

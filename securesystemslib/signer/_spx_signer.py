@@ -54,7 +54,7 @@ class SpxKey(Key):
         scheme = cls.DEFAULT_SCHEME
         keyval = {"public": public.hex()}
 
-        keyid = SpxSigner._get_keyid(  # pylint: disable=protected-access
+        keyid = Key.get_default_keyid(  # pylint: disable=protected-access
             keytype, scheme, keyval
         )
         return cls(keyid, keytype, scheme, keyval)

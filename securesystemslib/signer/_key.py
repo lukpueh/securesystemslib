@@ -12,6 +12,8 @@ from securesystemslib.exceptions import (
     UnverifiedSignatureError,
     VerificationError,
 )
+from securesystemslib.formats import encode_canonical
+from securesystemslib.hash import digest
 from securesystemslib.signer._signature import Signature
 
 CRYPTO_IMPORT_ERROR = None
@@ -41,7 +43,11 @@ try:
         SHA512,
         HashAlgorithm,
     )
-    from cryptography.hazmat.primitives.serialization import load_pem_public_key
+    from cryptography.hazmat.primitives.serialization import (
+        Encoding,
+        PublicFormat,
+        load_pem_public_key,
+    )
 except ImportError:
     CRYPTO_IMPORT_ERROR = "'pyca/cryptography' library required"
 
@@ -182,6 +188,20 @@ class Key(metaclass=ABCMeta):
         """
         raise NotImplementedError
 
+    @staticmethod
+    def get_default_keyid(keytype: str, scheme, keyval: Dict[str, Any]) -> str:
+        """Return sha256 hexdigest of the canonical json of the key."""
+        data = encode_canonical(
+            {
+                "keytype": keytype,
+                "scheme": scheme,
+                "keyval": keyval,
+            }
+        ).encode("utf-8")
+        hasher = digest("sha256")
+        hasher.update(data)
+        return hasher.hexdigest()
+
 
 class SSlibKey(Key):
     """Key implementation for RSA, Ed25519, ECDSA keys"""
@@ -223,6 +243,74 @@ class SSlibKey(Key):
         """Helper to load public key instance from PEM-formatted keyval."""
         public_bytes = self.keyval["public"].encode("utf-8")
         return load_pem_public_key(public_bytes)
+
+    @staticmethod
+    def _get_keytype_for_crypto_key(public_key: PublicKeyTypes) -> str:
+        if isinstance(public_key, RSAPublicKey):
+            return "rsa"
+
+        if isinstance(public_key, EllipticCurvePublicKey):
+            return "ecdsa"
+
+        if isinstance(public_key, Ed25519PublicKey):
+            return "ed25519"
+
+        raise ValueError(f"unsupported 'public_key' type {type(public_key)}")
+
+    @staticmethod
+    def _get_default_scheme(keytype: str) -> str:
+        if keytype == "rsa":
+            return "rsassa-pss-sha256"
+
+        if keytype == "ecdsa":
+            return "ecdsa-sha2-nistp256"
+
+        if keytype == "ed25519":
+            return "ed25519"
+
+        raise ValueError(f"unsupported 'keytype' {keytype}")
+
+    @classmethod
+    def _from_crypto_public_key_types(
+        cls,
+        public_key: PublicKeyTypes,
+        keyid: Optional[str],
+        scheme: Optional[str],
+    ) -> "SSlibKey":
+        keytype = cls._get_keytype_for_crypto_key(public_key)
+        if not scheme:
+            scheme = cls._get_default_scheme(keytype)
+
+        if keytype in ["rsa", "ecdsa"]:
+            pem: bytes = public_key.public_bytes(
+                encoding=Encoding.PEM, format=PublicFormat.SubjectPublicKeyInfo
+            )
+            public_key_value = pem.decode()
+
+        else:  # ed25519
+            raw: bytes = public_key.public_bytes(
+                encoding=Encoding.Raw, format=PublicFormat.Raw
+            )
+            public_key_value = raw.hex()
+
+        keyval = {"public": public_key_value}
+
+        if not keyid:
+            keyid = cls.get_default_keyid(keytype, scheme, keyval)
+
+        return SSlibKey(keyid, keytype, scheme, keyval)
+
+    @classmethod
+    def from_file(
+        cls,
+        path: str,
+        scheme: Optional[str] = None,
+        keyid: Optional[str] = None,
+    ) -> "SSlibKey":
+        with open(path, "rb") as f:
+            pem = f.read()
+        public_key = load_pem_public_key(pem)
+        return cls._from_crypto_public_key_types(public_key, keyid, scheme)
 
     @staticmethod
     def _get_hash_algorithm(name: str) -> "HashAlgorithm":

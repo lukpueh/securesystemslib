@@ -8,8 +8,6 @@ from urllib import parse
 
 import securesystemslib.keys as sslib_keys
 from securesystemslib.exceptions import UnsupportedLibraryError
-from securesystemslib.formats import encode_canonical
-from securesystemslib.hash import digest
 from securesystemslib.signer._key import Key, SSlibKey
 from securesystemslib.signer._signature import Signature
 
@@ -44,8 +42,6 @@ try:
         HashAlgorithm,
     )
     from cryptography.hazmat.primitives.serialization import (
-        Encoding,
-        PublicFormat,
         load_pem_private_key,
     )
 except ImportError:
@@ -157,20 +153,6 @@ class Signer(metaclass=ABCMeta):
         return signer.from_priv_key_uri(
             priv_key_uri, public_key, secrets_handler
         )
-
-    @staticmethod
-    def _get_keyid(keytype: str, scheme, keyval: Dict[str, Any]) -> str:
-        """Get keyid as sha256 hexdigest of the cjson representation of key fields."""
-        data = encode_canonical(
-            {
-                "keytype": keytype,
-                "scheme": scheme,
-                "keyval": keyval,
-            }
-        ).encode("utf-8")
-        hasher = digest("sha256")
-        hasher.update(data)
-        return hasher.hexdigest()
 
 
 class SSlibSigner(Signer):
@@ -405,28 +387,11 @@ class RSASigner(CryptoSigner):
         self._padding = self._get_rsa_padding(padding_name, self._algorithm)
 
     @classmethod
-    def _create_public_key(
-        cls, private_key: RSAPrivateKey, scheme: str
-    ) -> SSlibKey:
-        """Helper to create SSlibKey from pyca/crypto private key."""
-        # TODO: This probably should be on SSlibKey._from_crypto, because the
-        # exact keyval format does not need to be known in CryptoSigner
-        #  (CryptoSigners could be used with other keys too). Also, this looks
-        #  the same for rsa and ecdsa, only ed25519 is different. COuld use one
-        #  method for all three.
-
-        public_key = private_key.public_key()
-        public_pem = public_key.public_bytes(
-            encoding=Encoding.PEM, format=PublicFormat.SubjectPublicKeyInfo
-        )
-        keytype = "rsa"
-        keyval = {"public": public_pem.decode()}
-        keyid = cls._get_keyid(keytype, scheme, keyval)
-        return SSlibKey(keyid, keytype, scheme, keyval)
-
-    @classmethod
     def generate(
-        cls, scheme: str = "rsassa-pss-sha256", size: int = 3072
+        cls,
+        keyid: Optional[str] = None,
+        scheme: Optional[str] = None,
+        size: int = 3072,
     ) -> "RSASigner":
         """Generate new rsa key pair."""
         if CRYPTO_IMPORT_ERROR:
@@ -436,7 +401,9 @@ class RSASigner(CryptoSigner):
             public_exponent=65537,
             key_size=size,
         )
-        public_key = cls._create_public_key(private_key, scheme)
+        public_key = SSlibKey._from_crypto_public_key_types(  # pylint: disable=protected-access
+            private_key.public_key(), keyid, scheme
+        )
         return cls(public_key, private_key)
 
     @staticmethod

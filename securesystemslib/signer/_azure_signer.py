@@ -231,7 +231,7 @@ class AzureSigner(Signer):
 
         keytype, scheme = cls._get_keytype_and_scheme(key_vault_key.key.crv)
         keyval = {"public": pem.decode("utf-8")}
-        keyid = cls._get_keyid(keytype, scheme, keyval)
+        keyid = Key.get_default_keyid(keytype, scheme, keyval)
         public_key = SSlibKey(keyid, keytype, scheme, keyval)
         priv_key_uri = key_vault_key.key.kid.replace("https:", "azurekms:")
 

@@ -189,7 +189,7 @@ class SigstoreSigner(Signer):
         keytype = SigstoreKey.DEFAULT_KEY_TYPE
         scheme = SigstoreKey.DEFAULT_SCHEME
         keyval = {"identity": identity, "issuer": issuer}
-        keyid = cls._get_keyid(keytype, scheme, keyval)
+        keyid = Key.get_default_keyid(keytype, scheme, keyval)
         key = SigstoreKey(keyid, keytype, scheme, keyval)
         uri = cls._get_uri(ambient)
 

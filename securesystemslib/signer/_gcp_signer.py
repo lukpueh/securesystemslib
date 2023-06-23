@@ -103,7 +103,7 @@ class GCPSigner(Signer):
             ) from e
 
         keyval = {"public": kms_pubkey.pem}
-        keyid = cls._get_keyid(keytype, scheme, keyval)
+        keyid = Key.get_default_keyid(keytype, scheme, keyval)
         public_key = SSlibKey(keyid, keytype, scheme, keyval)
 
         return f"{cls.SCHEME}:{gcp_keyid}", public_key
