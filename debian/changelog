@@ -1,3 +1,13 @@
+python-securesystemslib (0.28.0-1) unstable; urgency=medium
+
+  * New upstream release includes among other things:
+    - ...
+
+  * d/control
+    - Change gnupg2 to gnupg
+
+ -- Lukas Puehringer <lukas.puehringer@nyu.edu>  Tue, 07 Nov 2023 12:12:00 +0100
+
 python-securesystemslib (0.26.0-1) unstable; urgency=medium
 
   * New upstream release includes among other things:
