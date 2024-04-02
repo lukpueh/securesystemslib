@@ -2,7 +2,7 @@
 
 import logging
 from abc import ABCMeta, abstractmethod
-from typing import Any, Dict, Optional, Tuple, Type, cast
+from typing import Any, Callable, Dict, Optional, Tuple, Type, cast
 
 from securesystemslib._vendor.ed25519.ed25519 import (
     SignatureMismatch,
@@ -247,11 +247,14 @@ class SSlibKey(Key):
         return load_pem_public_key(public_bytes)
 
     @staticmethod
-    def _from_crypto(public_key: "PublicKeyTypes") -> Tuple[str, str, str]:
-        """Return tuple of keytype, default scheme and serialized public key
-        value for the passed public key.
+    def _from_crypto(
+        public_key: "PublicKeyTypes",
+    ) -> Tuple[str, str, list[str], Callable]:
+        """Return tuple of keytype, default scheme, supported schemes list, and
+        a function to lazy-serialize the public key value using the keytype
+        specific format.
 
-        Raise ValueError if public key is not supported.
+        Raise ValueError if public key is not supported
         """
 
         def _raw() -> str:
@@ -265,19 +268,43 @@ class SSlibKey(Key):
             ).decode()
 
         if isinstance(public_key, RSAPublicKey):
-            return "rsa", "rsassa-pss-sha256", _pem()
+            return (
+                "rsa",
+                "rsassa-pss-sha256",
+                [
+                    "rsassa-pss-sha224",
+                    "rsassa-pss-sha256",
+                    "rsassa-pss-sha384",
+                    "rsassa-pss-sha512",
+                    "rsa-pkcs1v15-sha224",
+                    "rsa-pkcs1v15-sha256",
+                    "rsa-pkcs1v15-sha384",
+                    "rsa-pkcs1v15-sha512",
+                ],
+                _pem,
+            )
 
         if isinstance(public_key, EllipticCurvePublicKey):
             if isinstance(public_key.curve, SECP256R1):
-                return "ecdsa", "ecdsa-sha2-nistp256", _pem()
+                return (
+                    "ecdsa",
+                    "ecdsa-sha2-nistp256",
+                    ["ecdsa-sha2-nistp256"],
+                    _pem,
+                )
 
             if isinstance(public_key.curve, SECP384R1):
-                return "ecdsa", "ecdsa-sha2-nistp384", _pem()
+                return (
+                    "ecdsa",
+                    "ecdsa-sha2-nistp384",
+                    ["ecdsa-sha2-nistp384"],
+                    _pem,
+                )
 
             raise ValueError(f"unsupported curve '{public_key.curve.name}'")
 
         if isinstance(public_key, Ed25519PublicKey):
-            return "ed25519", "ed25519", _raw()
+            return "ed25519", "ed25519", ["ed25519"], _raw
 
         raise ValueError(f"unsupported key '{type(public_key)}'")
 
@@ -308,12 +335,21 @@ class SSlibKey(Key):
         if CRYPTO_IMPORT_ERROR:
             raise UnsupportedLibraryError(CRYPTO_IMPORT_ERROR)
 
-        keytype, default_scheme, public_key_value = cls._from_crypto(public_key)
+        keytype, default_scheme, supported_schemes, public_key_value = (
+            cls._from_crypto(public_key)
+        )
 
         if not scheme:
             scheme = default_scheme
 
-        keyval = {"public": public_key_value}
+        else:
+            if scheme not in supported_schemes:
+                raise ValueError(
+                    f"unsupported '{scheme}' for key {type(public_key)}, "
+                    f"supported schemes are: {supported_schemes}"
+                )
+
+        keyval = {"public": public_key_value()}
 
         if not keyid:
             keyid = compute_default_keyid(keytype, scheme, keyval)
