@@ -12,8 +12,8 @@
   See LICENSE for licensing information.
 
 <Purpose>
-  Public facing modules (e.g. interface.py and keys.py) must be
-  importable, even if the optional dependencies are not installed.
+  Public facing modules must be importable, even if the optional dependencies
+  are not installed.
 
   Each public facing function should always be callable and present
   meaningful user-feedback if an optional dependency that is required for
