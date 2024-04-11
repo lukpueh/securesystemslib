@@ -1,5 +1,8 @@
 name: Test AWS KMS with localstack
-on: [ push, pull_request ]
+
+on:
+  push:
+  pull_request:
 
 jobs:
   test-aws-kms:
