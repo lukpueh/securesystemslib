@@ -2,7 +2,8 @@
 
 import logging
 from abc import ABCMeta, abstractmethod
-from typing import Any, Dict, Optional, Tuple, Type, cast
+from dataclasses import astuple, dataclass
+from typing import Any, Dict, Optional, Tuple, Type, Union, cast
 
 from securesystemslib._vendor.ed25519.ed25519 import (
     SignatureMismatch,
@@ -197,6 +198,22 @@ class Key(metaclass=ABCMeta):
         raise NotImplementedError
 
 
+@dataclass
+class _RSASignArgs:
+    padding: "AsymmetricPadding"
+    hash_algo: "HashAlgorithm"
+
+
+@dataclass
+class _ECDSASignArgs:
+    sig_algo: "ECDSA"
+
+
+@dataclass
+class _NoSignArgs:
+    pass
+
+
 class SSlibKey(Key):
     """Key implementation for RSA, Ed25519, ECDSA keys"""
 
@@ -222,10 +239,74 @@ class SSlibKey(Key):
     def to_dict(self) -> Dict[str, Any]:
         return self._to_dict()
 
-    def _crypto_key(self) -> "PublicKeyTypes":
-        """Helper to get a `cryptography` public key for this SSlibKey."""
-        public_bytes = self.keyval["public"].encode("utf-8")
-        return load_pem_public_key(public_bytes)
+    def _to_crypto(
+        self,
+    ) -> Tuple[
+        "PublicKeyTypes", Union[_RSASignArgs, _ECDSASignArgs, _NoSignArgs]
+    ]:
+        """To crypto helper"""
+
+        def _validate_type(key, type_):
+            if not isinstance(key, type_):
+                raise ValueError(f"bad key {key} for {self.scheme}")
+
+        def _validate_curve(key, curve):
+            if not isinstance(key.curve, curve):
+                raise ValueError(f"bad curve {key.curve} for {self.scheme}")
+
+        def _from_pem():
+            public_bytes = self.keyval["public"].encode("utf-8")
+            return load_pem_public_key(public_bytes)
+
+        key: PublicKeyTypes
+        sign_args: Union[_RSASignArgs, _ECDSASignArgs, _NoSignArgs]
+
+        if self.keytype == "rsa" and self.scheme in [
+            "rsassa-pss-sha224",
+            "rsassa-pss-sha256",
+            "rsassa-pss-sha384",
+            "rsassa-pss-sha512",
+            "rsa-pkcs1v15-sha224",
+            "rsa-pkcs1v15-sha256",
+            "rsa-pkcs1v15-sha384",
+            "rsa-pkcs1v15-sha512",
+        ]:
+            key = cast(RSAPublicKey, _from_pem())
+            _validate_type(key, RSAPublicKey)
+            padding_name, hash_name = self.scheme.split("-")[1:]
+            hash_algorithm = self._get_hash_algorithm(hash_name)
+            padding = self._get_rsa_padding(padding_name, hash_algorithm)
+            sign_args = _RSASignArgs(padding, hash_algorithm)
+
+        elif (
+            self.keytype in ["ecdsa", "ecdsa-sha2-nistp256"]
+            and self.scheme == "ecdsa-sha2-nistp256"
+        ):
+            key = cast(EllipticCurvePublicKey, _from_pem())
+            _validate_type(key, EllipticCurvePublicKey)
+            _validate_curve(key, SECP256R1)
+            sign_args = _ECDSASignArgs(ECDSA(SHA256()))
+
+        elif (
+            self.keytype in ["ecdsa", "ecdsa-sha2-nistp384"]
+            and self.scheme == "ecdsa-sha2-nistp384"
+        ):
+            key = cast(EllipticCurvePublicKey, _from_pem())
+            _validate_type(key, EllipticCurvePublicKey)
+            _validate_curve(key, SECP384R1)
+            sign_args = _ECDSASignArgs(ECDSA(SHA384()))
+
+        elif self.keytype == "ed25519" and self.scheme == "ed25519":
+            public_bytes = bytes.fromhex(self.keyval["public"])
+            key = Ed25519PublicKey.from_public_bytes(public_bytes)
+            sign_args = _NoSignArgs()
+
+        else:
+            raise ValueError(
+                f"Unsupported public key {self.keytype}/{self.scheme}"
+            )
+
+        return key, sign_args
 
     @staticmethod
     def _from_crypto(public_key: "PublicKeyTypes") -> Tuple[str, str, str]:
@@ -341,41 +422,10 @@ class SSlibKey(Key):
 
     def _verify(self, signature: bytes, data: bytes) -> None:
         """Helper to verify signature using pyca/cryptography (default)."""
+
+        key, sign_args = self._to_crypto()
         try:
-            key: PublicKeyTypes
-            if self.scheme in [
-                "rsassa-pss-sha224",
-                "rsassa-pss-sha256",
-                "rsassa-pss-sha384",
-                "rsassa-pss-sha512",
-                "rsa-pkcs1v15-sha224",
-                "rsa-pkcs1v15-sha256",
-                "rsa-pkcs1v15-sha384",
-                "rsa-pkcs1v15-sha512",
-            ]:
-                key = cast(RSAPublicKey, self._crypto_key())
-                padding_name, hash_name = self.scheme.split("-")[1:]
-                hash_algorithm = self._get_hash_algorithm(hash_name)
-                padding = self._get_rsa_padding(padding_name, hash_algorithm)
-                key.verify(signature, data, padding, hash_algorithm)
-
-            elif self.scheme in [
-                "ecdsa-sha2-nistp256",
-                "ecdsa-sha2-nistp384",
-            ]:
-                key = cast(EllipticCurvePublicKey, self._crypto_key())
-                hash_name = f"sha{self.scheme[-3:]}"
-                hash_algorithm = self._get_hash_algorithm(hash_name)
-                signature_algorithm = ECDSA(hash_algorithm)
-                key.verify(signature, data, signature_algorithm)
-
-            elif self.scheme in ["ed25519"]:
-                public_bytes = bytes.fromhex(self.keyval["public"])
-                key = Ed25519PublicKey.from_public_bytes(public_bytes)
-                key.verify(signature, data)
-
-            else:
-                raise ValueError(f"unknown scheme '{self.scheme}'")
+            key.verify(signature, data, *astuple(sign_args))  # type: ignore
 
         except InvalidSignature as e:
             raise UnverifiedSignatureError from e
@@ -399,6 +449,7 @@ class SSlibKey(Key):
             return self._verify(signature_bytes, data)
 
         except UnverifiedSignatureError as e:
+
             raise UnverifiedSignatureError(
                 f"Failed to verify signature by {self.keyid}"
             ) from e
