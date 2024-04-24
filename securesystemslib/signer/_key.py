@@ -343,7 +343,7 @@ class SSlibKey(Key):
         """Helper to verify signature using pyca/cryptography (default)."""
         try:
             key: PublicKeyTypes
-            if self.scheme in [
+            if self.keytype == "rsa" and self.scheme in [
                 "rsassa-pss-sha224",
                 "rsassa-pss-sha256",
                 "rsassa-pss-sha384",
@@ -359,23 +359,29 @@ class SSlibKey(Key):
                 padding = self._get_rsa_padding(padding_name, hash_algorithm)
                 key.verify(signature, data, padding, hash_algorithm)
 
-            elif self.scheme in [
-                "ecdsa-sha2-nistp256",
-                "ecdsa-sha2-nistp384",
-            ]:
+            elif (
+                self.keytype in ["ecdsa", "ecdsa-sha2-nistp256"]
+                and self.scheme == "ecdsa-sha2-nistp256"
+            ):
                 key = cast(EllipticCurvePublicKey, self._crypto_key())
-                hash_name = f"sha{self.scheme[-3:]}"
-                hash_algorithm = self._get_hash_algorithm(hash_name)
-                signature_algorithm = ECDSA(hash_algorithm)
-                key.verify(signature, data, signature_algorithm)
+                key.verify(signature, data, ECDSA(SHA256()))
 
-            elif self.scheme in ["ed25519"]:
+            elif (
+                self.keytype in ["ecdsa", "ecdsa-sha2-nistp384"]
+                and self.scheme == "ecdsa-sha2-nistp384"
+            ):
+                key = cast(EllipticCurvePublicKey, self._crypto_key())
+                key.verify(signature, data, ECDSA(SHA384()))
+
+            elif self.keytype == "ed25519" and self.scheme == "ed25519":
                 public_bytes = bytes.fromhex(self.keyval["public"])
                 key = Ed25519PublicKey.from_public_bytes(public_bytes)
                 key.verify(signature, data)
 
             else:
-                raise ValueError(f"unknown scheme '{self.scheme}'")
+                raise ValueError(
+                    f"Unsupported public key {self.keytype}/{self.scheme}"
+                )
 
         except InvalidSignature as e:
             raise UnverifiedSignatureError from e
