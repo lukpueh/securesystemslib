@@ -2,7 +2,7 @@
 
 import logging
 from abc import ABCMeta, abstractmethod
-from typing import Any, Dict, Optional, Tuple, Type, cast
+from typing import Any, Dict, Optional, Tuple, Type
 
 from securesystemslib._vendor.ed25519.ed25519 import (
     SignatureMismatch,
@@ -353,7 +353,10 @@ class SSlibKey(Key):
                 "rsa-pkcs1v15-sha384",
                 "rsa-pkcs1v15-sha512",
             ]:
-                key = cast(RSAPublicKey, self._crypto_key())
+                key = self._crypto_key()
+                if not isinstance(key, RSAPublicKey):
+                    raise ValueError(f"Invalid {key} for {self.scheme}")
+
                 padding_name, hash_name = self.scheme.split("-")[1:]
                 hash_algorithm = self._get_hash_algorithm(hash_name)
                 padding = self._get_rsa_padding(padding_name, hash_algorithm)
@@ -362,16 +365,29 @@ class SSlibKey(Key):
             elif (
                 self.keytype in ["ecdsa", "ecdsa-sha2-nistp256"]
                 and self.scheme == "ecdsa-sha2-nistp256"
-            ):
-                key = cast(EllipticCurvePublicKey, self._crypto_key())
-                key.verify(signature, data, ECDSA(SHA256()))
-
-            elif (
+            ) or (
                 self.keytype in ["ecdsa", "ecdsa-sha2-nistp384"]
                 and self.scheme == "ecdsa-sha2-nistp384"
             ):
-                key = cast(EllipticCurvePublicKey, self._crypto_key())
-                key.verify(signature, data, ECDSA(SHA384()))
+                key = self._crypto_key()
+                if not isinstance(key, EllipticCurvePublicKey):
+                    raise ValueError(f"Invalid {key} for {self.scheme}")
+
+                if self.scheme == "ecdsa-sha2-nistp256":
+                    if not isinstance(key.curve, SECP256R1):
+                        raise ValueError(
+                            f"Invalid {key.curve} for {self.scheme}"
+                        )
+                    sig_algo = ECDSA(SHA256())
+
+                if self.scheme == "ecdsa-sha2-nistp384":
+                    if not isinstance(key.curve, SECP384R1):
+                        raise ValueError(
+                            f"Invalid {key.curve} for {self.scheme}"
+                        )
+                    sig_algo = ECDSA(SHA384())
+
+                key.verify(signature, data, sig_algo)
 
             elif self.keytype == "ed25519" and self.scheme == "ed25519":
                 public_bytes = bytes.fromhex(self.keyval["public"])
