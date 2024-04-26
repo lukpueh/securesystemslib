@@ -35,6 +35,7 @@ SIGNER_FOR_URI_SCHEME.update(
         GPGSigner.SCHEME: GPGSigner,
         AzureSigner.SCHEME: AzureSigner,
         AWSSigner.SCHEME: AWSSigner,
+        VaultSigner.SCHEME: VaultSigner,
     }
 )
 

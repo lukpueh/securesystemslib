@@ -2,6 +2,7 @@
 
 from base64 import b64decode, b64encode
 from typing import Optional, Tuple
+from urllib import parse
 
 from securesystemslib.exceptions import UnsupportedLibraryError
 from securesystemslib.signer._key import Key, SSlibKey
@@ -58,7 +59,14 @@ class VaultSigner(Signer):
         public_key: Key,
         secrets_handler: Optional[SecretsHandler] = None,
     ) -> "VaultSigner":
-        raise RuntimeError
+        uri = parse.urlparse(priv_key_uri)
+
+        if uri.scheme != cls.SCHEME:
+            raise ValueError(f"VaultSigner does not support {priv_key_uri}")
+
+        name, version = uri.path.split("/")
+
+        return cls(name, int(version), public_key)
 
     @classmethod
     def import_(cls, hv_key_name: str) -> Tuple[str, Key]:

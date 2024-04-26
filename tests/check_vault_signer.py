@@ -5,7 +5,7 @@
 import unittest
 
 from securesystemslib.exceptions import UnverifiedSignatureError
-from securesystemslib.signer import VaultSigner
+from securesystemslib.signer import Signer, VaultSigner
 
 
 class TestVaultSigner(unittest.TestCase):
@@ -25,11 +25,9 @@ class TestVaultSigner(unittest.TestCase):
             )
             self.assertEqual(scheme, public_key.scheme)
 
-            # # Test load
-            # signer = Signer.from_priv_key_uri(uri, public_key)
-            # self.assertIsInstance(signer, VaultSigner)
-
-            signer = VaultSigner(hv_key_name, version, public_key)
+            # Test load
+            signer = Signer.from_priv_key_uri(uri, public_key)
+            self.assertIsInstance(signer, VaultSigner)
 
             # Test sign and verify
             signature = signer.sign(b"DATA")
