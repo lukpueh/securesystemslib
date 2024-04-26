@@ -74,13 +74,13 @@ class VaultSigner(Signer):
         client = hvac.Client()
         resp = client.secrets.transit.read_key(hv_key_name)
 
-        # Extract "newest" key from response
-        # TODO: include key version in uri
-        pub_b64 = sorted(resp["data"]["keys"].items())[-1][1]["public_key"]
-        pub_raw = b64decode(pub_b64)
-        pub_crypto = Ed25519PublicKey.from_public_bytes(pub_raw)
+        # Assume we want the newest key for the passed name
+        version, key_info = sorted(resp["data"]["keys"].items())[-1]
+        crypto_key = Ed25519PublicKey.from_public_bytes(
+            b64decode(key_info["public_key"])
+        )
 
-        pub = SSlibKey.from_crypto(pub_crypto)
-        uri = f"{VaultSigner.SCHEME}:{hv_key_name}"
+        key = SSlibKey.from_crypto(crypto_key)
+        uri = f"{VaultSigner.SCHEME}:{hv_key_name}/{version}"
 
-        return uri, pub
+        return uri, key
