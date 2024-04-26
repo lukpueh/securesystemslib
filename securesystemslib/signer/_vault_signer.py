@@ -26,9 +26,7 @@ class VaultSigner(Signer):
 
     SCHEME = "hv"
 
-    def __init__(
-        self, hv_key_name: str, hv_key_version: int, public_key: SSlibKey
-    ):
+    def __init__(self, hv_key_name: str, hv_key_version: int, public_key: Key):
         if VAULT_IMPORT_ERROR:
             raise UnsupportedLibraryError(VAULT_IMPORT_ERROR)
 
@@ -49,7 +47,7 @@ class VaultSigner(Signer):
         return Signature(self.public_key.keyid, sig)
 
     @property
-    def public_key(self) -> SSlibKey:
+    def public_key(self) -> Key:
         return self._public_key
 
     @classmethod
