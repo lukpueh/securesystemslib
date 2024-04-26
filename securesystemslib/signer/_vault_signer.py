@@ -22,25 +22,55 @@ except ImportError:
 
 
 class VaultSigner(Signer):
-    """HashiCorp Vault Signer (Transit secrets engine)"""
+    """Signer for HashiCorp Vault Transit secrets engine
+
+    The signer uses "ambient" credentials to connect to vault, most notably
+    the environment variables ``VAULT_ADDR`` and ``VAULT_TOKEN`` must be set:
+    https://developer.hashicorp.com/vault/docs/commands#environment-variables
+
+    Priv key uri format is: ``hv:<KEY NAME>/<KEY VERSION>``.
+
+    Arguments:
+        hv_key_name: Name of vault key used for signing.
+        public_key: Related public key instance.
+        hv_key_version: Version of vault key used for signing.
+
+    Raises:
+        UnsupportedLibraryError: hvac or cryptography are not installed.
+    """
 
     SCHEME = "hv"
 
-    def __init__(self, hv_key_name: str, hv_key_version: int, public_key: Key):
+    def __init__(self, hv_key_name: str, public_key: Key, hv_key_version: int):
         if VAULT_IMPORT_ERROR:
             raise UnsupportedLibraryError(VAULT_IMPORT_ERROR)
 
         self.hv_key_name = hv_key_name
-        self.hv_key_version = hv_key_version
         self._public_key = public_key
+        self.hv_key_version = hv_key_version
+
+        # Client caches ambient settings in __init__. This means settings are
+        # stable for subsequent calls to sign, also if the environment changes.
         self._client = hvac.Client()
 
     def sign(self, payload: bytes) -> Signature:
+        """Signs payload with HashiCorp Vault Transit secrets engine.
+
+        Arguments:
+            payload: bytes to be signed.
+
+        Raises:
+            Various errors from hvac.
+
+        Returns:
+            Signature.
+        """
         resp = self._client.secrets.transit.sign_data(
             self.hv_key_name,
             hash_input=b64encode(payload).decode(),
             key_version=self.hv_key_version,
         )
+
         sig_b64 = resp["data"]["signature"].split(":")[2]
         sig = b64decode(sig_b64).hex()
 
@@ -64,14 +94,26 @@ class VaultSigner(Signer):
 
         name, version = uri.path.split("/")
 
-        return cls(name, int(version), public_key)
+        return cls(name, public_key, int(version))
 
     @classmethod
     def import_(cls, hv_key_name: str) -> Tuple[str, Key]:
-        """Load key and signer details from vault.
+        """Load key and signer details from HashiCorp Vault.
 
-        Supported keytypes:
-        * ed25519
+        If multiple keys exist in the vault under the passed name, only the
+        newest key is returned. Supported key type is: ed25519
+
+        See class documentation for details about settings and uri format.
+
+        Arguments:
+            hv_key_name: Name of vault key to import.
+
+        Raises:
+            UnsupportedLibraryError: hvac or cryptography are not installed.
+            Various errors from hvac.
+
+        Returns:
+            Private key uri and public key.
 
         """
         if VAULT_IMPORT_ERROR:
