@@ -16,14 +16,12 @@ class TestVaultSigner(unittest.TestCase):
         # - see tests/scripts/init-vault.sh for how keys are created
         # - see tox.ini for how credentials etc. are passed via env vars
         keys_and_schemes = [("test-key-ed25519", 1, "ed25519")]
-        for hv_key_name, version, scheme in keys_and_schemes:
+        for name, version, scheme in keys_and_schemes:
             # Test import
-            uri, public_key = VaultSigner.import_(hv_key_name)
+            uri, public_key = VaultSigner.import_(name)
 
-            self.assertEqual(
-                uri, f"{VaultSigner.SCHEME}:{hv_key_name}/{version}"
-            )
-            self.assertEqual(scheme, public_key.scheme)
+            self.assertEqual(uri, f"{VaultSigner.SCHEME}:{name}/{version}")
+            self.assertEqual(public_key.scheme, scheme)
 
             # Test load
             signer = Signer.from_priv_key_uri(uri, public_key)
