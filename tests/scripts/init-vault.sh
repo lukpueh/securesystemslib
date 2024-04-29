@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
-vault server -dev -dev-root-token-id="${VAULT_TOKEN}" &
+# Start vault in background.  `|| true` eats the non-zero exit code, when the
+# background process is killed, so that it does not fail the Github Action.
+{ vault server -dev -dev-root-token-id="${VAULT_TOKEN}" & } || true
 
 until vault status
 do
