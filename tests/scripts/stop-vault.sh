@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-$pid=(pgrep -f vault)
+pid=$(pgrep -f vault)
 kill $pid
 
 # make sure to exit with 0
