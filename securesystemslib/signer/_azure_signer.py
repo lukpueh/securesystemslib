@@ -28,6 +28,7 @@ try:
         Encoding,
         PublicFormat,
     )
+
 except ImportError:
     AZURE_IMPORT_ERROR = (
         "Signing with Azure Key Vault requires azure-identity, "
@@ -66,27 +67,34 @@ class AzureSigner(Signer):
 
     SCHEME = "azurekms"
 
-    def __init__(self, az_key_uri: str, public_key: Key):
+    def __init__(self, az_key_uri: str, public_key: SSlibKey):
         if AZURE_IMPORT_ERROR:
             raise UnsupportedLibraryError(AZURE_IMPORT_ERROR)
 
-        try:
-            cred = DefaultAzureCredential()
-            self.crypto_client = CryptographyClient(
-                az_key_uri,
-                credential=cred,
+        if public_key.keytype != "ecdsa" or public_key.scheme not in [
+            "ecdsa-sha2-nistp256",
+            "ecdsa-sha2-nistp384",
+            "ecdsa-sha2-nistp521",
+        ]:
+            logger.info("only EC keys are supported for now")
+            raise UnsupportedKeyType(
+                "Supplied key must be an EC key on curve nistp256, nistp384, "
+                "or nistp521"
             )
-            self.signature_algorithm = self._get_signature_algorithm(
-                public_key,
-            )
-            self.hash_algorithm = self._get_hash_algorithm(public_key)
-        except UnsupportedKeyType as e:
-            logger.info("Key %s has unsupported key type or unsupported elliptic curve")
-            raise e
+
+        cred = DefaultAzureCredential()
+        self.crypto_client = CryptographyClient(
+            az_key_uri,
+            credential=cred,
+        )
+        self.signature_algorithm = self._get_signature_algorithm(
+            public_key,
+        )
+        self.hash_algorithm = public_key.get_hash_algorithm_name()
         self._public_key = public_key
 
     @property
-    def public_key(self) -> Key:
+    def public_key(self) -> SSlibKey:
         return self._public_key
 
     @staticmethod
@@ -129,39 +137,15 @@ class AzureSigner(Signer):
             raise e
 
     @staticmethod
-    def _get_signature_algorithm(public_key: Key) -> SignatureAlgorithm:
+    def _get_signature_algorithm(public_key: SSlibKey) -> SignatureAlgorithm:
         """Return SignatureAlgorithm after parsing the public key"""
-        if public_key.keytype != "ecdsa":
-            logger.info("only EC keys are supported for now")
-            raise UnsupportedKeyType("Supplied key must be an EC key")
-        # Format is "ecdsa-sha2-nistp256"
-        comps = public_key.scheme.split("-")
-        if len(comps) != 3:  # noqa: PLR2004
-            raise UnsupportedKeyType("Invalid scheme found")
 
-        if comps[2] == "nistp256":
+        if public_key.scheme == "ecdsa-sha2-nistp256":
             return SignatureAlgorithm.es256
-        if comps[2] == "nistp384":
+        if public_key.scheme == "ecdsa-sha2-nistp384":
             return SignatureAlgorithm.es384
-        if comps[2] == "nistp521":
+        if public_key.scheme == "ecdsa-sha2-nistp521":
             return SignatureAlgorithm.es512
-
-        raise UnsupportedKeyType("Unsupported curve supplied by key")
-
-    @staticmethod
-    def _get_hash_algorithm(public_key: Key) -> str:
-        """Return the hash algorithm used by the public key"""
-        # Format is "ecdsa-sha2-nistp256"
-        comps = public_key.scheme.split("-")
-        if len(comps) != 3:  # noqa: PLR2004
-            raise UnsupportedKeyType("Invalid scheme found")
-
-        if comps[2] == "nistp256":
-            return "sha256"
-        if comps[2] == "nistp384":
-            return "sha384"
-        if comps[2] == "nistp521":
-            return "sha512"
 
         raise UnsupportedKeyType("Unsupported curve supplied by key")
 
@@ -192,7 +176,7 @@ class AzureSigner(Signer):
         return cls(az_key_uri, public_key)
 
     @classmethod
-    def import_(cls, az_vault_name: str, az_key_name: str) -> tuple[str, Key]:
+    def import_(cls, az_vault_name: str, az_key_name: str) -> tuple[str, SSlibKey]:
         """Load key and signer details from KMS
 
         Returns the private key uri and the public key. This method should only

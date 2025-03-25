@@ -74,7 +74,7 @@ class AWSSigner(Signer):
         "rsa-pkcs1v15-sha512": "RSASSA_PKCS1_V1_5_SHA_512",
     }
 
-    def __init__(self, aws_key_id: str, public_key: Key):
+    def __init__(self, aws_key_id: str, public_key: SSlibKey):
         if AWS_IMPORT_ERROR:
             raise UnsupportedLibraryError(AWS_IMPORT_ERROR)
 
@@ -84,7 +84,7 @@ class AWSSigner(Signer):
         self.aws_algo = self.aws_algos[self.public_key.scheme]
 
     @property
-    def public_key(self) -> Key:
+    def public_key(self) -> SSlibKey:
         return self._public_key
 
     @classmethod
@@ -121,7 +121,7 @@ class AWSSigner(Signer):
     @classmethod
     def import_(
         cls, aws_key_id: str, local_scheme: str | None = None
-    ) -> tuple[str, Key]:
+    ) -> tuple[str, SSlibKey]:
         """Loads a key and signer details from AWS KMS.
 
         Returns the private key uri and the public key. This method should only
